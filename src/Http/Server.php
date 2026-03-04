@@ -46,18 +46,24 @@ class Server
     {
         $server = new SwooleServer($this->host, $this->webPort);
 
-        $server->set([
+        $serverConfig = [
             'worker_num' => 2,
             'enable_coroutine' => false,
             'max_request' => 0,
             'dispatch_mode' => 2,
             'log_level' => SWOOLE_LOG_WARNING,
             'daemonize' => false,
-            // Static file serving
-            'enable_static_handler' => true,
-            'document_root' => $this->publicDir,
-            'static_handler_locations' => ['/assets'],
-        ]);
+        ];
+
+        // Swoole static handler only works with real filesystem paths (not phar)
+        $realPublicDir = realpath($this->publicDir);
+        if ($realPublicDir !== false && !str_contains($realPublicDir, '.phar')) {
+            $serverConfig['enable_static_handler'] = true;
+            $serverConfig['document_root'] = $realPublicDir;
+            $serverConfig['static_handler_locations'] = ['/assets'];
+        }
+
+        $server->set($serverConfig);
 
         $server->on('start', function (SwooleServer $server) {
             echo "CC Switch server started on http://{$this->host}:{$this->webPort}\n";
@@ -133,6 +139,32 @@ class Server
                 $response->status(204);
                 $response->end();
                 return;
+            }
+
+            // Serve static assets (handles both phar and filesystem)
+            if (str_starts_with($uri, '/assets/')) {
+                $filePath = $this->publicDir . $uri;
+                if (file_exists($filePath)) {
+                    $ext = pathinfo($uri, PATHINFO_EXTENSION);
+                    $mimeTypes = [
+                        'js' => 'application/javascript',
+                        'css' => 'text/css',
+                        'html' => 'text/html',
+                        'json' => 'application/json',
+                        'png' => 'image/png',
+                        'jpg' => 'image/jpeg',
+                        'svg' => 'image/svg+xml',
+                        'ico' => 'image/x-icon',
+                        'woff2' => 'font/woff2',
+                        'woff' => 'font/woff',
+                        'ttf' => 'font/ttf',
+                    ];
+                    $response->status(200);
+                    $response->header('Content-Type', $mimeTypes[$ext] ?? 'application/octet-stream');
+                    $response->header('Cache-Control', 'public, max-age=3600');
+                    $response->end(file_get_contents($filePath));
+                    return;
+                }
             }
 
             // API routes
