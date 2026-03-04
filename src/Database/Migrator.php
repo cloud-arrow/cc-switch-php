@@ -128,10 +128,19 @@ class Migrator
      */
     private function getMigrationFiles(): array
     {
-        $pattern = $this->migrationsDir . '/*.sql';
-        $files = glob($pattern);
-        if ($files === false) {
+        // Use scandir instead of glob for phar:// compatibility
+        if (!is_dir($this->migrationsDir)) {
             return [];
+        }
+        $entries = scandir($this->migrationsDir);
+        if ($entries === false) {
+            return [];
+        }
+        $files = [];
+        foreach ($entries as $entry) {
+            if (str_ends_with($entry, '.sql')) {
+                $files[] = $this->migrationsDir . '/' . $entry;
+            }
         }
         sort($files);
         return $files;

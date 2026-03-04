@@ -27,9 +27,16 @@ class UniversalProviderController
         $data = [
             'id' => $body['id'] ?? Uuid::uuid4()->toString(),
             'name' => $body['name'] ?? '',
+            'provider_type' => $body['provider_type'] ?? 'openai',
+            'apps' => $body['apps'] ?? '{}',
+            'base_url' => $body['base_url'] ?? '',
+            'api_key' => $body['api_key'] ?? '',
+            'models' => $body['models'] ?? '{}',
+            'website_url' => $body['website_url'] ?? null,
+            'notes' => $body['notes'] ?? null,
+            'created_at' => $body['created_at'] ?? time(),
             'settings_config' => $body['settings_config'] ?? '{}',
             'category' => $body['category'] ?? null,
-            'notes' => $body['notes'] ?? null,
             'meta' => $body['meta'] ?? '{}',
         ];
         $this->repo->insert($data);
@@ -42,7 +49,7 @@ class UniversalProviderController
         if ($existing === null) {
             return ['status' => 404, 'body' => ['error' => 'Universal provider not found']];
         }
-        $allowed = ['name', 'settings_config', 'category', 'notes', 'meta'];
+        $allowed = ['name', 'provider_type', 'apps', 'base_url', 'api_key', 'models', 'website_url', 'notes', 'settings_config', 'category', 'meta'];
         $data = array_intersect_key($body, array_flip($allowed));
         if (!empty($data)) {
             $this->repo->update($vars['id'], $data);

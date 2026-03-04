@@ -160,10 +160,11 @@ function ccSwitch() {
             const args = this.mcpForm.args
                 ? this.mcpForm.args.split(',').map(s => s.trim()).filter(Boolean)
                 : [];
+            const id = this.mcpForm.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || ('mcp-' + Date.now());
             await this.api('POST', '/api/mcp', {
+                id: id,
                 name: this.mcpForm.name,
-                command: this.mcpForm.command,
-                args: args,
+                server_config: JSON.stringify({ type: 'stdio', command: this.mcpForm.command, args: args }),
             });
             this.showAddMcp = false;
             this.mcpForm = { name: '', command: '', args: '' };
@@ -287,7 +288,7 @@ function ccSwitch() {
 
         async savePrompt() {
             const data = {
-                title: this.promptForm.title,
+                name: this.promptForm.title,
                 content: this.promptForm.content,
             };
 

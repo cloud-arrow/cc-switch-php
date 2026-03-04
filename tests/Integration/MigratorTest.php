@@ -26,7 +26,7 @@ class MigratorTest extends TestCase
         $migrator = new Migrator($this->pdo, $this->migrationsDir);
         $count = $migrator->migrate();
 
-        $this->assertSame(14, $count);
+        $this->assertSame(15, $count);
     }
 
     public function testMigrateIsIdempotent(): void
@@ -34,7 +34,7 @@ class MigratorTest extends TestCase
         $migrator = new Migrator($this->pdo, $this->migrationsDir);
 
         $first = $migrator->migrate();
-        $this->assertSame(14, $first);
+        $this->assertSame(15, $first);
 
         $second = $migrator->migrate();
         $this->assertSame(0, $second);
@@ -47,7 +47,7 @@ class MigratorTest extends TestCase
 
         $status = $migrator->status();
 
-        $this->assertCount(14, $status);
+        $this->assertCount(15, $status);
         foreach ($status as $s) {
             $this->assertTrue($s['applied'], "Migration {$s['file']} should be applied");
             $this->assertSame(1, $s['batch']);
@@ -59,7 +59,7 @@ class MigratorTest extends TestCase
         $migrator = new Migrator($this->pdo, $this->migrationsDir);
         $status = $migrator->status();
 
-        $this->assertCount(14, $status);
+        $this->assertCount(15, $status);
         foreach ($status as $s) {
             $this->assertFalse($s['applied']);
             $this->assertNull($s['batch']);

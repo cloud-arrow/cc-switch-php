@@ -380,11 +380,11 @@ class ApiContractTest extends TestCase
             'name' => 'Universal Test',
             'settings_config' => '{}',
         ]);
-        // Controller add() does not pass required NOT NULL columns (provider_type, base_url, api_key)
-        // to the DB, so this returns 500. Verify error contract.
-        $this->assertSame(500, $result['status']);
+        $this->assertSame(201, $result['status']);
         $body = $this->decodeBody($result);
-        $this->assertArrayHasKey('error', $body);
+        $this->assertSame('uni-1', $body['id']);
+        $this->assertSame('Universal Test', $body['name']);
+        $this->assertSame('{}', $body['settings_config']);
     }
 
     public function testUpdateUniversalProviderContract(): void

@@ -1,6 +1,9 @@
 /vendor/
 /build/
+/node_modules/
 *.phar
 .phpunit.cache/
 cc-switch.db
 .phpunit.result.cache
+package-lock.json
+tests/E2E/ui/results/

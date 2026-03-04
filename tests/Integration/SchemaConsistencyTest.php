@@ -201,11 +201,12 @@ class SchemaConsistencyTest extends TestCase
         $expectedColumns = [
             'id', 'name', 'provider_type', 'apps', 'base_url',
             'api_key', 'models', 'website_url', 'notes', 'created_at',
+            'settings_config', 'category', 'meta',
         ];
 
         $columns = $this->getColumnNames('universal_providers');
         $this->assertSame($expectedColumns, $columns);
-        $this->assertCount(10, $columns);
+        $this->assertCount(13, $columns);
 
         $keyed = $this->getColumnsKeyed('universal_providers');
 
@@ -219,6 +220,9 @@ class SchemaConsistencyTest extends TestCase
         $this->assertColumn($keyed, 'website_url', 'TEXT', false, null, false, 'universal_providers');
         $this->assertColumn($keyed, 'notes', 'TEXT', false, null, false, 'universal_providers');
         $this->assertColumn($keyed, 'created_at', 'INTEGER', false, null, false, 'universal_providers');
+        $this->assertColumn($keyed, 'settings_config', 'TEXT', true, '{}', false, 'universal_providers');
+        $this->assertColumn($keyed, 'category', 'TEXT', false, null, false, 'universal_providers');
+        $this->assertColumn($keyed, 'meta', 'TEXT', true, '{}', false, 'universal_providers');
     }
 
     // ─── 4. mcp_servers ────────────────────────────────────────────
