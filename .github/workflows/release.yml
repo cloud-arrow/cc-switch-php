@@ -99,6 +99,8 @@ jobs:
         run: |
           if [ "${{ runner.os }}" = "Linux" ]; then
             sudo ./spc doctor --auto-fix
+            # Fix ownership after sudo doctor created dirs as root
+            sudo chown -R $(id -u):$(id -g) . || true
           else
             ./spc doctor --auto-fix
           fi
