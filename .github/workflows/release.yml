@@ -19,29 +19,9 @@ env:
   SPC_EXTENSIONS: "swoole,pdo_sqlite,phar,curl,openssl,mbstring,tokenizer,filter,zlib,sockets,pcntl,posix,ctype,fileinfo,session"
 
 jobs:
-  build:
-    name: Build (${{ matrix.target }})
-    runs-on: ${{ matrix.runner }}
-    strategy:
-      matrix:
-        include:
-          - target: linux-x86_64
-            runner: ubuntu-latest
-            spc_os: linux
-            spc_arch: x86_64
-          - target: linux-aarch64
-            runner: ubuntu-latest
-            spc_os: linux
-            spc_arch: aarch64
-          - target: macos-x86_64
-            runner: macos-13
-            spc_os: macos
-            spc_arch: x86_64
-          - target: macos-aarch64
-            runner: macos-14
-            spc_os: macos
-            spc_arch: aarch64
-
+  phar:
+    name: Build .phar
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -64,6 +44,40 @@ jobs:
       - name: Compile .phar
         run: php box.phar compile
 
+      - name: Upload .phar artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cc-switch-phar
+          path: build/cc-switch.phar
+
+  build:
+    name: Build (${{ matrix.target }})
+    needs: phar
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: linux-x86_64
+            runner: ubuntu-latest
+            spc_os: linux
+            spc_arch: x86_64
+          - target: linux-aarch64
+            runner: ubuntu-24.04-arm
+            spc_os: linux
+            spc_arch: aarch64
+          - target: macos-aarch64
+            runner: macos-latest
+            spc_os: macos
+            spc_arch: aarch64
+
+    steps:
+      - name: Download .phar
+        uses: actions/download-artifact@v4
+        with:
+          name: cc-switch-phar
+          path: build
+
       - name: Install build tools (Linux)
         if: runner.os == 'Linux'
         run: |
@@ -81,16 +95,20 @@ jobs:
           tar -xzf spc.tgz
           chmod +x spc
 
+      - name: Setup spc environment
+        run: |
+          if [ "${{ runner.os }}" = "Linux" ]; then
+            sudo ./spc doctor --auto-fix
+          else
+            ./spc doctor --auto-fix
+          fi
+
       - name: Download PHP sources
         run: |
-          PHP_TAG=$(curl -sfSL "https://api.github.com/repos/php/php-src/tags?per_page=20" \
-            | grep -o '"name": "php-${{ env.SPC_PHP_VERSION }}[^"]*"' \
-            | head -1 | grep -o 'php-[0-9.]*') || true
-
           CUSTOM_URL_FLAG=""
           if ! curl -sfSL --max-time 10 "https://www.php.net/releases/index.php?json&version=${{ env.SPC_PHP_VERSION }}" > /dev/null 2>&1; then
             echo "php.net unreachable, using GitHub mirror"
-            CUSTOM_URL_FLAG="--custom-url=php-src:https://github.com/php/php-src/archive/refs/tags/${PHP_TAG:-php-${{ env.SPC_PHP_VERSION }}.30}.tar.gz"
+            CUSTOM_URL_FLAG="--custom-url=php-src:https://github.com/php/php-src/archive/refs/tags/php-8.3.30.tar.gz"
           fi
 
           ./spc download \
@@ -100,8 +118,7 @@ jobs:
             ${CUSTOM_URL_FLAG}
 
       - name: Build micro.sfx
-        run: |
-          ./spc build "${{ env.SPC_EXTENSIONS }}" --build-micro
+        run: ./spc build "${{ env.SPC_EXTENSIONS }}" --build-micro
 
       - name: Create standalone binary
         run: |
@@ -109,6 +126,7 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             VERSION="${{ github.event.inputs.version || 'dev' }}"
           fi
+
           MICRO_SFX="$(find buildroot -name 'micro.sfx' -type f | head -1)"
           if [ -z "${MICRO_SFX}" ]; then
             echo "Error: micro.sfx not found"
@@ -142,7 +160,7 @@ jobs:
       - name: Generate checksums
         run: |
           cd artifacts
-          sha256sum cc-switch-* > checksums-${{ github.ref_name }}.sha256
+          sha256sum cc-switch-${{ github.ref_name }}-* > checksums-${{ github.ref_name }}.sha256
           cat checksums-${{ github.ref_name }}.sha256
 
       - name: Create GitHub Release
