@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CC Switch</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <link rel="stylesheet" href="/assets/style.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js"></script>
+</head>
+<body x-data="ccSwitch()" x-init="init()">
+    <div class="app-layout">
+        <!-- Sidebar -->
+        <nav class="sidebar">
+            <header>
+                <h2>CC Switch</h2>
+            </header>
+            <ul>
+                <li :class="{ active: currentTab === 'providers' }">
+                    <a href="#" @click.prevent="switchTab('providers')">Providers</a>
+                </li>
+                <li :class="{ active: currentTab === 'mcp' }">
+                    <a href="#" @click.prevent="switchTab('mcp')">MCP</a>
+                </li>
+                <li :class="{ active: currentTab === 'proxy' }">
+                    <a href="#" @click.prevent="switchTab('proxy')">Proxy</a>
+                </li>
+                <li :class="{ active: currentTab === 'skills' }">
+                    <a href="#" @click.prevent="switchTab('skills')">Skills</a>
+                </li>
+                <li :class="{ active: currentTab === 'prompts' }">
+                    <a href="#" @click.prevent="switchTab('prompts')">Prompts</a>
+                </li>
+                <li :class="{ active: currentTab === 'settings' }">
+                    <a href="#" @click.prevent="switchTab('settings')">Settings</a>
+                </li>
+                <li :class="{ active: currentTab === 'usage' }">
+                    <a href="#" @click.prevent="switchTab('usage')">Usage</a>
+                </li>
+            </ul>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="content">
+            <!-- App Type Selector (shown for provider/prompt/proxy tabs) -->
+            <div class="app-selector" x-show="['providers','prompts','proxy'].includes(currentTab)">
+                <template x-for="app in apps" :key="app">
+                    <button
+                        :class="{ 'outline': currentApp !== app, 'contrast': currentApp === app }"
+                        @click="switchApp(app)"
+                        x-text="app"
+                        class="app-btn"
+                    ></button>
+                </template>
+            </div>
+
+            <!-- Providers Tab -->
+            <section x-show="currentTab === 'providers'">
+                <div class="tab-header">
+                    <h3>Providers <small x-text="'(' + currentApp + ')'"></small></h3>
+                    <button @click="showAddProvider = true" class="btn-sm">+ Add</button>
+                </div>
+
+                <div x-show="loading" class="loading" aria-busy="true">Loading...</div>
+
+                <table x-show="!loading && providers.length > 0" role="grid">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Category</th>
+                            <th>Current</th>
+                            <th>Failover</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="p in providers" :key="p.id">
+                            <tr :class="{ 'row-active': p.is_current }">
+                                <td x-text="p.name"></td>
+                                <td x-text="p.category || '-'"></td>
+                                <td>
+                                    <span x-show="p.is_current" class="badge badge-ok">Active</span>
+                                </td>
+                                <td>
+                                    <span x-show="p.in_failover_queue" class="badge badge-info">In Queue</span>
+                                </td>
+                                <td class="actions">
+                                    <button x-show="!p.is_current" @click="switchProvider(p.id)" class="btn-sm outline">Switch</button>
+                                    <button @click="editProvider(p)" class="btn-sm outline secondary">Edit</button>
+                                    <button @click="deleteProvider(p.id)" class="btn-sm outline secondary">Del</button>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+
+                <p x-show="!loading && providers.length === 0">No providers configured for <span x-text="currentApp"></span>.</p>
+
+                <!-- Add/Edit Provider Dialog -->
+                <dialog :open="showAddProvider || editingProvider !== null">
+                    <article>
+                        <header>
+                            <button aria-label="Close" rel="prev" @click="closeProviderForm()"></button>
+                            <h4 x-text="editingProvider ? 'Edit Provider' : 'Add Provider'"></h4>
+                        </header>
+                        <label>Name
+                            <input type="text" x-model="providerForm.name" placeholder="Provider name">
+                        </label>
+                        <label>Category
+                            <input type="text" x-model="providerForm.category" placeholder="e.g. official, openrouter">
+                        </label>
+                        <label>Settings Config (JSON)
+                            <textarea x-model="providerForm.settings_config" rows="6" placeholder='{"env":{"ANTHROPIC_API_KEY":"..."}}'></textarea>
+                        </label>
+                        <label>Notes
+                            <textarea x-model="providerForm.notes" rows="2" placeholder="Optional notes"></textarea>
+                        </label>
+                        <label>Meta (JSON)
+                            <textarea x-model="providerForm.meta" rows="3" placeholder='{"costMultiplier":"1.0"}'></textarea>
+                        </label>
+                        <footer>
+                            <button class="secondary" @click="closeProviderForm()">Cancel</button>
+                            <button @click="saveProvider()" x-text="editingProvider ? 'Update' : 'Add'"></button>
+                        </footer>
+                    </article>
+                </dialog>
+            </section>
+
+            <!-- MCP Tab -->
+            <section x-show="currentTab === 'mcp'">
+                <div class="tab-header">
+                    <h3>MCP Servers</h3>
+                    <div>
+                        <button @click="syncMcp()" class="btn-sm outline secondary">Sync</button>
+                        <button @click="showAddMcp = true" class="btn-sm">+ Add</button>
+                    </div>
+                </div>
+
+                <div x-show="loading" class="loading" aria-busy="true">Loading...</div>
+
+                <table x-show="!loading && mcpServers.length > 0" role="grid">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Command / URL</th>
+                            <th>Type</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="m in mcpServers" :key="m.id">
+                            <tr>
+                                <td x-text="m.name"></td>
+                                <td x-text="m.command || m.url || '-'" class="text-truncate"></td>
+                                <td x-text="m.type || 'stdio'"></td>
+                                <td>
+                                    <button @click="deleteMcp(m.id)" class="btn-sm outline secondary">Del</button>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+
+                <p x-show="!loading && mcpServers.length === 0">No MCP servers configured.</p>
+
+                <dialog :open="showAddMcp">
+                    <article>
+                        <header>
+                            <button aria-label="Close" rel="prev" @click="showAddMcp = false"></button>
+                            <h4>Add MCP Server</h4>
+                        </header>
+                        <label>Name
+                            <input type="text" x-model="mcpForm.name" placeholder="Server name">
+                        </label>
+                        <label>Command
+                            <input type="text" x-model="mcpForm.command" placeholder="npx -y @modelcontextprotocol/server-xxx">
+                        </label>
+                        <label>Args (comma separated)
+                            <input type="text" x-model="mcpForm.args" placeholder="arg1,arg2">
+                        </label>
+                        <footer>
+                            <button class="secondary" @click="showAddMcp = false">Cancel</button>
+                            <button @click="addMcp()">Add</button>
+                        </footer>
+                    </article>
+                </dialog>
+            </section>
+
+            <!-- Proxy Tab -->
+            <section x-show="currentTab === 'proxy'">
+                <div class="tab-header">
+                    <h3>Proxy <small x-text="'(' + currentApp + ')'"></small></h3>
+                </div>
+
+                <div class="proxy-status-panel">
+                    <div class="grid">
+                        <div>
+                            <strong>Status:</strong>
+                            <span x-text="proxyStatus.running ? 'Running' : 'Stopped'" :class="proxyStatus.running ? 'badge badge-ok' : 'badge badge-err'"></span>
+                        </div>
+                        <div>
+                            <button x-show="!proxyStatus.running" @click="startProxy()" class="btn-sm">Start Proxy</button>
+                            <button x-show="proxyStatus.running" @click="stopProxy()" class="btn-sm outline secondary">Stop Proxy</button>
+                        </div>
+                    </div>
+                </div>
+
+                <h4>Config</h4>
+                <div x-show="proxyConfig">
+                    <div class="grid">
+                        <label>Enabled
+                            <input type="checkbox" role="switch" :checked="proxyConfig.enabled" @change="proxyConfig.enabled = $event.target.checked ? 1 : 0">
+                        </label>
+                        <label>Auto Failover
+                            <input type="checkbox" role="switch" :checked="proxyConfig.auto_failover_enabled" @change="proxyConfig.auto_failover_enabled = $event.target.checked ? 1 : 0">
+                        </label>
+                        <label>Logging
+                            <input type="checkbox" role="switch" :checked="proxyConfig.enable_logging" @change="proxyConfig.enable_logging = $event.target.checked ? 1 : 0">
+                        </label>
+                    </div>
+                    <div class="grid">
+                        <label>Failure Threshold
+                            <input type="number" x-model.number="proxyConfig.circuit_failure_threshold" min="1">
+                        </label>
+                        <label>Success Threshold
+                            <input type="number" x-model.number="proxyConfig.circuit_success_threshold" min="1">
+                        </label>
+                        <label>Timeout (s)
+                            <input type="number" x-model.number="proxyConfig.circuit_timeout_seconds" min="1">
+                        </label>
+                    </div>
+                    <div class="grid">
+                        <label>First Byte Timeout (s)
+                            <input type="number" x-model.number="proxyConfig.streaming_first_byte_timeout" min="1">
+                        </label>
+                        <label>Idle Timeout (s)
+                            <input type="number" x-model.number="proxyConfig.streaming_idle_timeout" min="1">
+                        </label>
+                        <label>Non-stream Timeout (s)
+                            <input type="number" x-model.number="proxyConfig.non_streaming_timeout" min="1">
+                        </label>
+                    </div>
+                    <button @click="saveProxyConfig()">Save Config</button>
+                </div>
+
+                <h4>Health</h4>
+                <div x-show="loading" aria-busy="true">Loading...</div>
+                <table x-show="proxyHealth.length > 0" role="grid">
+                    <thead><tr><th>Provider</th><th>State</th><th>Failures</th><th>Total</th></tr></thead>
+                    <tbody>
+                        <template x-for="h in proxyHealth" :key="h.provider_id">
+                            <tr>
+                                <td x-text="h.provider_id"></td>
+                                <td><span :class="'badge badge-' + (h.state === 'closed' ? 'ok' : h.state === 'half_open' ? 'warn' : 'err')" x-text="h.state"></span></td>
+                                <td x-text="h.failures"></td>
+                                <td x-text="h.total_requests || 0"></td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+                <p x-show="!loading && proxyHealth.length === 0">No health data available.</p>
+            </section>
+
+            <!-- Skills Tab -->
+            <section x-show="currentTab === 'skills'">
+                <div class="tab-header">
+                    <h3>Skills</h3>
+                    <div>
+                        <button @click="syncSkills()" class="btn-sm outline secondary">Sync</button>
+                        <button @click="showInstallSkill = true" class="btn-sm">+ Install</button>
+                    </div>
+                </div>
+
+                <div x-show="loading" class="loading" aria-busy="true">Loading...</div>
+
+                <table x-show="!loading && skills.length > 0" role="grid">
+                    <thead><tr><th>Name</th><th>Description</th><th>Actions</th></tr></thead>
+                    <tbody>
+                        <template x-for="s in skills" :key="s.id">
+                            <tr>
+                                <td x-text="s.name"></td>
+                                <td x-text="s.description || '-'" class="text-truncate"></td>
+                                <td><button @click="deleteSkill(s.id)" class="btn-sm outline secondary">Del</button></td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+
+                <p x-show="!loading && skills.length === 0">No skills installed.</p>
+
+                <dialog :open="showInstallSkill">
+                    <article>
+                        <header>
+                            <button aria-label="Close" rel="prev" @click="showInstallSkill = false"></button>
+                            <h4>Install Skill</h4>
+                        </header>
+                        <label>Name
+                            <input type="text" x-model="skillForm.name" placeholder="Skill name">
+                        </label>
+                        <label>Source URL or Path
+                            <input type="text" x-model="skillForm.source" placeholder="https://... or /path/to/skill">
+                        </label>
+                        <footer>
+                            <button class="secondary" @click="showInstallSkill = false">Cancel</button>
+                            <button @click="installSkill()">Install</button>
+                        </footer>
+                    </article>
+                </dialog>
+            </section>
+
+            <!-- Prompts Tab -->
+            <section x-show="currentTab === 'prompts'">
+                <div class="tab-header">
+                    <h3>Prompts <small x-text="'(' + currentApp + ')'"></small></h3>
+                    <button @click="showAddPrompt = true" class="btn-sm">+ Add</button>
+                </div>
+
+                <div x-show="loading" class="loading" aria-busy="true">Loading...</div>
+
+                <table x-show="!loading && prompts.length > 0" role="grid">
+                    <thead><tr><th>Title</th><th>Content</th><th>Actions</th></tr></thead>
+                    <tbody>
+                        <template x-for="pr in prompts" :key="pr.id">
+                            <tr>
+                                <td x-text="pr.title || pr.name || '-'"></td>
+                                <td x-text="(pr.content || '').substring(0, 80)" class="text-truncate"></td>
+                                <td class="actions">
+                                    <button @click="editPrompt(pr)" class="btn-sm outline secondary">Edit</button>
+                                    <button @click="deletePrompt(pr.id)" class="btn-sm outline secondary">Del</button>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+
+                <p x-show="!loading && prompts.length === 0">No prompts for <span x-text="currentApp"></span>.</p>
+
+                <dialog :open="showAddPrompt || editingPrompt !== null">
+                    <article>
+                        <header>
+                            <button aria-label="Close" rel="prev" @click="closePromptForm()"></button>
+                            <h4 x-text="editingPrompt ? 'Edit Prompt' : 'Add Prompt'"></h4>
+                        </header>
+                        <label>Title
+                            <input type="text" x-model="promptForm.title" placeholder="Prompt title">
+                        </label>
+                        <label>Content
+                            <textarea x-model="promptForm.content" rows="8" placeholder="Prompt content..."></textarea>
+                        </label>
+                        <footer>
+                            <button class="secondary" @click="closePromptForm()">Cancel</button>
+                            <button @click="savePrompt()" x-text="editingPrompt ? 'Update' : 'Add'"></button>
+                        </footer>
+                    </article>
+                </dialog>
+            </section>
+
+            <!-- Settings Tab -->
+            <section x-show="currentTab === 'settings'">
+                <h3>Settings</h3>
+                <div x-show="loading" aria-busy="true">Loading...</div>
+
+                <div x-show="!loading && settings">
+                    <label>Theme
+                        <select x-model="settings.theme">
+                            <option value="dark">Dark</option>
+                            <option value="light">Light</option>
+                            <option value="auto">Auto</option>
+                        </select>
+                    </label>
+                    <label>Language
+                        <select x-model="settings.language">
+                            <option value="en">English</option>
+                            <option value="zh">Chinese</option>
+                            <option value="ja">Japanese</option>
+                        </select>
+                    </label>
+                    <label>Auto Start Proxy
+                        <input type="checkbox" role="switch" :checked="settings.auto_start_proxy" @change="settings.auto_start_proxy = $event.target.checked">
+                    </label>
+                    <button @click="saveSettings()">Save Settings</button>
+                </div>
+            </section>
+
+            <!-- Usage Tab -->
+            <section x-show="currentTab === 'usage'">
+                <h3>Usage</h3>
+
+                <div class="grid">
+                    <label>App
+                        <select x-model="usageFilter.app" @change="loadUsageStats()">
+                            <template x-for="app in apps" :key="app">
+                                <option :value="app" x-text="app"></option>
+                            </template>
+                        </select>
+                    </label>
+                    <label>Period
+                        <select x-model="usageFilter.period" @change="loadUsageStats()">
+                            <option value="today">Today</option>
+                            <option value="week">This Week</option>
+                            <option value="month">This Month</option>
+                            <option value="all">All Time</option>
+                        </select>
+                    </label>
+                </div>
+
+                <div x-show="usageStats" class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value" x-text="usageStats.total_requests || 0"></div>
+                        <div class="stat-label">Total Requests</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" x-text="formatTokens(usageStats.total_input_tokens || 0)"></div>
+                        <div class="stat-label">Input Tokens</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" x-text="formatTokens(usageStats.total_output_tokens || 0)"></div>
+                        <div class="stat-label">Output Tokens</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" x-text="'$' + (usageStats.total_cost || 0).toFixed(4)"></div>
+                        <div class="stat-label">Total Cost</div>
+                    </div>
+                </div>
+
+                <h4>Recent Logs</h4>
+                <table x-show="usageLogs.length > 0" role="grid">
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Model</th>
+                            <th>Input</th>
+                            <th>Output</th>
+                            <th>Cost</th>
+                            <th>Latency</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="log in usageLogs" :key="log.request_id">
+                            <tr>
+                                <td x-text="formatTime(log.created_at)"></td>
+                                <td x-text="log.model"></td>
+                                <td x-text="log.input_tokens"></td>
+                                <td x-text="log.output_tokens"></td>
+                                <td x-text="'$' + parseFloat(log.total_cost_usd || 0).toFixed(6)"></td>
+                                <td x-text="log.latency_ms + 'ms'"></td>
+                                <td>
+                                    <span :class="'badge ' + (log.status_code < 400 ? 'badge-ok' : 'badge-err')" x-text="log.status_code"></span>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+                <p x-show="usageLogs.length === 0">No usage logs yet.</p>
+            </section>
+
+            <!-- Toast Notification -->
+            <div class="toast" x-show="toast.show" x-transition :class="'toast-' + toast.type" x-text="toast.message"></div>
+        </main>
+    </div>
+
+    <script src="/assets/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,152 @@
+[
+  {
+    "name": "OpenAI Official",
+    "websiteUrl": "https://chatgpt.com/codex",
+    "isOfficial": true,
+    "category": "official",
+    "auth": {},
+    "config": "",
+    "icon": "openai",
+    "iconColor": "#00A67E",
+    "theme": { "icon": "codex", "backgroundColor": "#1F2937", "textColor": "#FFFFFF" }
+  },
+  {
+    "name": "Azure OpenAI",
+    "websiteUrl": "https://learn.microsoft.com/en-us/azure/ai-foundry/openai/how-to/codex",
+    "category": "third_party",
+    "isOfficial": true,
+    "auth": { "OPENAI_API_KEY": "" },
+    "config": "model_provider = \"azure\"\nmodel = \"gpt-5.2\"\nmodel_reasoning_effort = \"high\"\ndisable_response_storage = true\n\n[model_providers.azure]\nname = \"Azure OpenAI\"\nbase_url = \"https://YOUR_RESOURCE_NAME.openai.azure.com/openai\"\nenv_key = \"OPENAI_API_KEY\"\nquery_params = { \"api-version\" = \"2025-04-01-preview\" }\nwire_api = \"responses\"\nrequires_openai_auth = true",
+    "endpointCandidates": ["https://YOUR_RESOURCE_NAME.openai.azure.com/openai"],
+    "icon": "azure",
+    "iconColor": "#0078D4",
+    "theme": { "icon": "codex", "backgroundColor": "#0078D4", "textColor": "#FFFFFF" }
+  },
+  {
+    "name": "AiHubMix",
+    "websiteUrl": "https://aihubmix.com",
+    "category": "aggregator",
+    "auth": { "OPENAI_API_KEY": "" },
+    "config": "model_provider = \"aihubmix\"\nmodel = \"gpt-5.2\"\nmodel_reasoning_effort = \"high\"\ndisable_response_storage = true\n\n[model_providers.aihubmix]\nname = \"aihubmix\"\nbase_url = \"https://aihubmix.com/v1\"\nwire_api = \"responses\"\nrequires_openai_auth = true",
+    "endpointCandidates": ["https://aihubmix.com/v1", "https://api.aihubmix.com/v1"]
+  },
+  {
+    "name": "DMXAPI",
+    "websiteUrl": "https://www.dmxapi.cn",
+    "category": "aggregator",
+    "auth": { "OPENAI_API_KEY": "" },
+    "config": "model_provider = \"dmxapi\"\nmodel = \"gpt-5.2\"\nmodel_reasoning_effort = \"high\"\ndisable_response_storage = true\n\n[model_providers.dmxapi]\nname = \"dmxapi\"\nbase_url = \"https://www.dmxapi.cn/v1\"\nwire_api = \"responses\"\nrequires_openai_auth = true",
+    "endpointCandidates": ["https://www.dmxapi.cn/v1"],
+    "isPartner": true,
+    "partnerPromotionKey": "dmxapi"
+  },
+  {
+    "name": "PackyCode",
+    "websiteUrl": "https://www.packyapi.com",
+    "apiKeyUrl": "https://www.packyapi.com/register?aff=cc-switch",
+    "category": "third_party",
+    "auth": { "OPENAI_API_KEY": "" },
+    "config": "model_provider = \"packycode\"\nmodel = \"gpt-5.2\"\nmodel_reasoning_effort = \"high\"\ndisable_response_storage = true\n\n[model_providers.packycode]\nname = \"packycode\"\nbase_url = \"https://www.packyapi.com/v1\"\nwire_api = \"responses\"\nrequires_openai_auth = true",
+    "endpointCandidates": ["https://www.packyapi.com/v1", "https://api-slb.packyapi.com/v1"],
+    "isPartner": true,
+    "partnerPromotionKey": "packycode",
+    "icon": "packycode"
+  },
+  {
+    "name": "Cubence",
+    "websiteUrl": "https://cubence.com",
+    "apiKeyUrl": "https://cubence.com/signup?code=CCSWITCH&source=ccs",
+    "auth": { "OPENAI_API_KEY": "" },
+    "config": "model_provider = \"cubence\"\nmodel = \"gpt-5.2\"\nmodel_reasoning_effort = \"high\"\ndisable_response_storage = true\n\n[model_providers.cubence]\nname = \"cubence\"\nbase_url = \"https://api.cubence.com/v1\"\nwire_api = \"responses\"\nrequires_openai_auth = true",
+    "endpointCandidates": ["https://api.cubence.com/v1", "https://api-cf.cubence.com/v1", "https://api-dmit.cubence.com/v1", "https://api-bwg.cubence.com/v1"],
+    "category": "third_party",
+    "isPartner": true,
+    "partnerPromotionKey": "cubence",
+    "icon": "cubence",
+    "iconColor": "#000000"
+  },
+  {
+    "name": "AIGoCode",
+    "websiteUrl": "https://aigocode.com",
+    "apiKeyUrl": "https://aigocode.com/invite/CC-SWITCH",
+    "category": "third_party",
+    "auth": { "OPENAI_API_KEY": "" },
+    "config": "model_provider = \"aigocode\"\nmodel = \"gpt-5.2\"\nmodel_reasoning_effort = \"high\"\ndisable_response_storage = true\n\n[model_providers.aigocode]\nname = \"aigocode\"\nbase_url = \"https://api.aigocode.com\"\nwire_api = \"responses\"\nrequires_openai_auth = true",
+    "endpointCandidates": ["https://api.aigocode.com"],
+    "isPartner": true,
+    "partnerPromotionKey": "aigocode",
+    "icon": "aigocode",
+    "iconColor": "#5B7FFF"
+  },
+  {
+    "name": "RightCode",
+    "websiteUrl": "https://www.right.codes",
+    "apiKeyUrl": "https://www.right.codes/register?aff=CCSWITCH",
+    "auth": { "OPENAI_API_KEY": "" },
+    "config": "model_provider = \"rightcode\"\nmodel = \"gpt-5.2\"\nmodel_reasoning_effort = \"high\"\ndisable_response_storage = true\n\n[model_providers.rightcode]\nname = \"rightcode\"\nbase_url = \"https://right.codes/codex/v1\"\nwire_api = \"responses\"\nrequires_openai_auth = true",
+    "category": "third_party",
+    "isPartner": true,
+    "partnerPromotionKey": "rightcode",
+    "icon": "rc",
+    "iconColor": "#E96B2C"
+  },
+  {
+    "name": "AICodeMirror",
+    "websiteUrl": "https://www.aicodemirror.com",
+    "apiKeyUrl": "https://www.aicodemirror.com/register?invitecode=9915W3",
+    "auth": { "OPENAI_API_KEY": "" },
+    "config": "model_provider = \"aicodemirror\"\nmodel = \"gpt-5.2\"\nmodel_reasoning_effort = \"high\"\ndisable_response_storage = true\n\n[model_providers.aicodemirror]\nname = \"aicodemirror\"\nbase_url = \"https://api.aicodemirror.com/api/codex/backend-api/codex\"\nwire_api = \"responses\"\nrequires_openai_auth = true",
+    "endpointCandidates": ["https://api.aicodemirror.com/api/codex/backend-api/codex", "https://api.claudecode.net.cn/api/codex/backend-api/codex"],
+    "isPartner": true,
+    "partnerPromotionKey": "aicodemirror",
+    "icon": "aicodemirror",
+    "iconColor": "#000000"
+  },
+  {
+    "name": "AICoding",
+    "websiteUrl": "https://www.aicoding.sh",
+    "apiKeyUrl": "https://www.aicoding.sh/i/CCSWITCH",
+    "auth": { "OPENAI_API_KEY": "" },
+    "config": "model_provider = \"aicoding\"\nmodel = \"gpt-5.3-codex\"\nmodel_reasoning_effort = \"high\"\ndisable_response_storage = true\n\n[model_providers.aicoding]\nname = \"aicoding\"\nbase_url = \"https://api.aicoding.sh\"\nwire_api = \"responses\"\nrequires_openai_auth = true",
+    "endpointCandidates": ["https://api.aicoding.sh"],
+    "isPartner": true,
+    "partnerPromotionKey": "aicoding",
+    "icon": "aicoding",
+    "iconColor": "#000000"
+  },
+  {
+    "name": "CrazyRouter",
+    "websiteUrl": "https://www.crazyrouter.com",
+    "apiKeyUrl": "https://www.crazyrouter.com/register?aff=OZcm&ref=cc-switch",
+    "auth": { "OPENAI_API_KEY": "" },
+    "config": "model_provider = \"crazyrouter\"\nmodel = \"gpt-5.3-codex\"\nmodel_reasoning_effort = \"high\"\ndisable_response_storage = true\n\n[model_providers.crazyrouter]\nname = \"crazyrouter\"\nbase_url = \"https://crazyrouter.com/v1\"\nwire_api = \"responses\"\nrequires_openai_auth = true",
+    "endpointCandidates": ["https://crazyrouter.com/v1"],
+    "isPartner": true,
+    "partnerPromotionKey": "crazyrouter",
+    "icon": "crazyrouter",
+    "iconColor": "#000000"
+  },
+  {
+    "name": "SSSAiCode",
+    "websiteUrl": "https://www.sssaicode.com",
+    "apiKeyUrl": "https://www.sssaicode.com/register?ref=DCP0SM",
+    "auth": { "OPENAI_API_KEY": "" },
+    "config": "model_provider = \"sssaicode\"\nmodel = \"gpt-5.3-codex\"\nmodel_reasoning_effort = \"high\"\ndisable_response_storage = true\n\n[model_providers.sssaicode]\nname = \"sssaicode\"\nbase_url = \"https://node-hk.sssaicode.com/api\"\nwire_api = \"responses\"\nrequires_openai_auth = true",
+    "endpointCandidates": ["https://node-hk.sssaicode.com/api/v1", "https://claude2.sssaicode.com/api/v1", "https://anti.sssaicode.com/api/v1"],
+    "category": "third_party",
+    "isPartner": true,
+    "partnerPromotionKey": "sssaicode",
+    "icon": "sssaicode",
+    "iconColor": "#000000"
+  },
+  {
+    "name": "OpenRouter",
+    "websiteUrl": "https://openrouter.ai",
+    "apiKeyUrl": "https://openrouter.ai/keys",
+    "auth": { "OPENAI_API_KEY": "" },
+    "config": "model_provider = \"openrouter\"\nmodel = \"gpt-5.2\"\nmodel_reasoning_effort = \"high\"\ndisable_response_storage = true\n\n[model_providers.openrouter]\nname = \"openrouter\"\nbase_url = \"https://openrouter.ai/api/v1\"\nwire_api = \"responses\"\nrequires_openai_auth = true",
+    "category": "aggregator",
+    "icon": "openrouter",
+    "iconColor": "#6566F1"
+  }
+]

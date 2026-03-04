@@ -1,0 +1,48 @@
+[
+  {
+    "name": "NewAPI",
+    "providerType": "newapi",
+    "defaultApps": { "claude": true, "codex": true, "gemini": true },
+    "defaultModels": {
+      "claude": {
+        "model": "claude-sonnet-4-20250514",
+        "haikuModel": "claude-haiku-4-20250514",
+        "sonnetModel": "claude-sonnet-4-20250514",
+        "opusModel": "claude-sonnet-4-20250514"
+      },
+      "codex": {
+        "model": "gpt-4o",
+        "reasoningEffort": "high"
+      },
+      "gemini": {
+        "model": "gemini-2.5-pro"
+      }
+    },
+    "websiteUrl": "https://www.newapi.pro",
+    "icon": "newapi",
+    "iconColor": "#00A67E"
+  },
+  {
+    "name": "Custom Gateway",
+    "providerType": "custom_gateway",
+    "defaultApps": { "claude": true, "codex": true, "gemini": true },
+    "defaultModels": {
+      "claude": {
+        "model": "claude-sonnet-4-20250514",
+        "haikuModel": "claude-haiku-4-20250514",
+        "sonnetModel": "claude-sonnet-4-20250514",
+        "opusModel": "claude-sonnet-4-20250514"
+      },
+      "codex": {
+        "model": "gpt-4o",
+        "reasoningEffort": "high"
+      },
+      "gemini": {
+        "model": "gemini-2.5-pro"
+      }
+    },
+    "icon": "openai",
+    "iconColor": "#6366F1",
+    "isCustomTemplate": true
+  }
+]

@@ -1,0 +1,6 @@
+/vendor/
+/build/
+*.phar
+.phpunit.cache/
+cc-switch.db
+.phpunit.result.cache

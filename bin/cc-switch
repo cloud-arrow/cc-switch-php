@@ -1,0 +1,38 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+require __DIR__ . '/../vendor/autoload.php';
+
+use CcSwitch\App;
+use Symfony\Component\Console\Application;
+
+$app = App::boot();
+$console = new Application('cc-switch', '1.0.0');
+
+// Register commands
+$console->add(new \CcSwitch\Command\ServeCommand($app));
+$console->add(new \CcSwitch\Command\MigrateCommand($app));
+$console->add(new \CcSwitch\Command\Provider\ListCommand($app));
+$console->add(new \CcSwitch\Command\Provider\AddCommand($app));
+$console->add(new \CcSwitch\Command\Provider\SwitchCommand($app));
+$console->add(new \CcSwitch\Command\Provider\DeleteCommand($app));
+$console->add(new \CcSwitch\Command\Mcp\ListCommand($app));
+$console->add(new \CcSwitch\Command\Mcp\AddCommand($app));
+$console->add(new \CcSwitch\Command\Mcp\DeleteCommand($app));
+$console->add(new \CcSwitch\Command\Mcp\SyncCommand($app));
+$console->add(new \CcSwitch\Command\Proxy\StartCommand($app));
+$console->add(new \CcSwitch\Command\Proxy\StopCommand($app));
+$console->add(new \CcSwitch\Command\Sync\PushCommand($app));
+$console->add(new \CcSwitch\Command\Sync\PullCommand($app));
+$console->add(new \CcSwitch\Command\ImportCommand($app));
+$console->add(new \CcSwitch\Command\ExportCommand($app));
+$console->add(new \CcSwitch\Command\DbImportCommand($app));
+$console->add(new \CcSwitch\Command\DbExportCommand($app));
+$console->add(new \CcSwitch\Command\SpeedTestCommand($app));
+$console->add(new \CcSwitch\Command\EnvCheckCommand($app));
+$console->add(new \CcSwitch\Command\BackupCommand($app));
+$console->add(new \CcSwitch\Command\CompactCommand($app));
+
+$console->run();

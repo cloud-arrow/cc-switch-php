@@ -1,0 +1,13 @@
+parameters:
+    level: 5
+    paths:
+        - src
+    treatPhpDocTypesAsCertain: false
+    ignoreErrors:
+        # Medoo ORM PHPDoc signatures don't match actual usage (supports variable args)
+        - '#Method Medoo\\Medoo::select\(\) invoked with \d+ parameters, 5 required#'
+        - '#Parameter \#[23] \$\w+ of method Medoo\\Medoo::select\(\) expects#'
+        - message: '#Method Medoo\\Medoo::get\(\) invoked with \d+ parameters#'
+          reportUnmatched: false
+        - message: '#Parameter \#[23] \$\w+ of method Medoo\\Medoo::get\(\) expects#'
+          reportUnmatched: false

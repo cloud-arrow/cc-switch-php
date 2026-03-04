@@ -1,0 +1,14 @@
+{
+    "main": "bin/cc-switch",
+    "output": "build/cc-switch.phar",
+    "directories": ["src", "config", "migrations", "public"],
+    "finder": [
+        {
+            "in": ["vendor"],
+            "name": "*.php",
+            "exclude": ["tests", "Tests", "test", "Test", "docs", "doc"]
+        }
+    ],
+    "compression": "GZ",
+    "compactors": ["KevinGH\\Box\\Compactor\\Php"]
+}
