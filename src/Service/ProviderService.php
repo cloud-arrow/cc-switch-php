@@ -268,11 +268,17 @@ class ProviderService
                 // Map common override names to env keys
                 if ($key === 'apiKey') {
                     // Find the auth token key
-                    foreach (['ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_API_KEY', 'GOOGLE_API_KEY'] as $envKey) {
+                    $found = false;
+                    foreach (['ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_API_KEY', 'GOOGLE_API_KEY', 'GEMINI_API_KEY'] as $envKey) {
                         if (array_key_exists($envKey, $config['env'])) {
                             $config['env'][$envKey] = $value;
+                            $found = true;
                             break;
                         }
+                    }
+                    // If no existing key found, set GEMINI_API_KEY for Gemini or ANTHROPIC_API_KEY for Claude
+                    if (!$found) {
+                        $config['env']['GEMINI_API_KEY'] = $value;
                     }
                 } elseif ($key === 'baseUrl' && isset($config['env']['ANTHROPIC_BASE_URL'])) {
                     $config['env']['ANTHROPIC_BASE_URL'] = $value;
