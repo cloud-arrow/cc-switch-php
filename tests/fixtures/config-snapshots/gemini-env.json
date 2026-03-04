@@ -1,0 +1,22 @@
+{
+    "description": "Gemini with API key writes .env and sets auth type to gemini-api-key",
+    "input": {
+        "provider": {
+            "id": "gemini-pro",
+            "app_type": "gemini",
+            "name": "Gemini Pro",
+            "settings_config": "{\"env\":{\"GEMINI_API_KEY\":\"AIza-test-key\",\"GEMINI_MODEL\":\"gemini-2.5-pro\"}}"
+        }
+    },
+    "expected": {
+        "~/.gemini/.env": "GEMINI_API_KEY=AIza-test-key\nGEMINI_MODEL=gemini-2.5-pro",
+        "~/.gemini/.env_permissions": "0600",
+        "~/.gemini/settings.json": {
+            "security": {
+                "auth": {
+                    "selectedType": "gemini-api-key"
+                }
+            }
+        }
+    }
+}

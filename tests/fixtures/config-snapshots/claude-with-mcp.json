@@ -1,0 +1,46 @@
+{
+    "description": "Claude merge preserving existing mcpServers and env keys",
+    "input": {
+        "provider": {
+            "id": "openrouter",
+            "app_type": "claude",
+            "name": "OpenRouter",
+            "settings_config": "{\"env\":{\"ANTHROPIC_AUTH_TOKEN\":\"sk-or-new\",\"ANTHROPIC_BASE_URL\":\"https://openrouter.ai/api/v1\"},\"model\":\"claude-opus-4-6-20260206\"}"
+        },
+        "preExisting": {
+            "~/.claude/settings.json": {
+                "env": {
+                    "EXISTING_VAR": "keep-me"
+                },
+                "mcpServers": {
+                    "filesystem": {
+                        "command": "npx",
+                        "args": ["-y", "@modelcontextprotocol/server-filesystem"]
+                    }
+                },
+                "permissions": {
+                    "allow": ["Read", "Glob"]
+                }
+            }
+        }
+    },
+    "expected": {
+        "~/.claude/settings.json": {
+            "env": {
+                "EXISTING_VAR": "keep-me",
+                "ANTHROPIC_AUTH_TOKEN": "sk-or-new",
+                "ANTHROPIC_BASE_URL": "https://openrouter.ai/api/v1"
+            },
+            "mcpServers": {
+                "filesystem": {
+                    "command": "npx",
+                    "args": ["-y", "@modelcontextprotocol/server-filesystem"]
+                }
+            },
+            "permissions": {
+                "allow": ["Read", "Glob"]
+            },
+            "model": "claude-opus-4-6-20260206"
+        }
+    }
+}

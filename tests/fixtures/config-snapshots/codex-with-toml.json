@@ -1,0 +1,24 @@
+{
+    "description": "Codex preserving existing mcp_servers section in config.toml",
+    "input": {
+        "provider": {
+            "id": "codex-custom",
+            "app_type": "codex",
+            "name": "Codex Custom",
+            "settings_config": "{\"auth\":{\"OPENAI_API_KEY\":\"sk-new-key\"},\"config\":\"model = \\\"gpt-5\\\"\\n\"}"
+        },
+        "preExisting": {
+            "~/.codex/config.toml": "model = \"old-model\"\n\n[mcp_servers.myserver]\ncommand = \"node\"\nargs = [\"server.js\"]\n"
+        }
+    },
+    "expected": {
+        "~/.codex/auth.json": {
+            "OPENAI_API_KEY": "sk-new-key"
+        },
+        "~/.codex/config.toml_contains": [
+            "model = \"gpt-5\"",
+            "[mcp_servers.myserver]",
+            "command = \"node\""
+        ]
+    }
+}

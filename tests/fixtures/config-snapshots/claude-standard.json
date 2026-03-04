@@ -1,0 +1,19 @@
+{
+    "description": "Standard Claude provider with env vars written to settings.json",
+    "input": {
+        "provider": {
+            "id": "anthropic-direct",
+            "app_type": "claude",
+            "name": "Anthropic Direct",
+            "settings_config": "{\"env\":{\"ANTHROPIC_AUTH_TOKEN\":\"sk-ant-test123\",\"ANTHROPIC_BASE_URL\":\"https://api.anthropic.com\"}}"
+        }
+    },
+    "expected": {
+        "~/.claude/settings.json": {
+            "env": {
+                "ANTHROPIC_AUTH_TOKEN": "sk-ant-test123",
+                "ANTHROPIC_BASE_URL": "https://api.anthropic.com"
+            }
+        }
+    }
+}

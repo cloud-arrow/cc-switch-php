@@ -1,0 +1,23 @@
+{
+    "description": "Gemini OAuth mode - no API key sets auth type to oauth-personal",
+    "input": {
+        "provider": {
+            "id": "gemini-oauth",
+            "app_type": "gemini",
+            "name": "Gemini OAuth",
+            "settings_config": "{\"env\":{\"GEMINI_MODEL\":\"gemini-2.5-pro\"},\"config\":{\"theme\":\"dark\"}}"
+        }
+    },
+    "expected": {
+        "~/.gemini/.env": "GEMINI_MODEL=gemini-2.5-pro",
+        "~/.gemini/.env_permissions": "0600",
+        "~/.gemini/settings.json": {
+            "theme": "dark",
+            "security": {
+                "auth": {
+                    "selectedType": "oauth-personal"
+                }
+            }
+        }
+    }
+}

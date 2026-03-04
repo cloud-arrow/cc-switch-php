@@ -1,0 +1,38 @@
+{
+    "description": "OpenClaw additive mode - multiple providers under models.providers",
+    "input": {
+        "providers": [
+            {
+                "id": "provider-a",
+                "app_type": "openclaw",
+                "name": "Provider A",
+                "settings_config": "{\"baseUrl\":\"https://a.example.com\",\"apiKey\":\"key-a\",\"models\":[\"model-1\"]}"
+            },
+            {
+                "id": "provider-b",
+                "app_type": "openclaw",
+                "name": "Provider B",
+                "settings_config": "{\"baseUrl\":\"https://b.example.com\",\"apiKey\":\"key-b\",\"models\":[\"model-2\",\"model-3\"]}"
+            }
+        ]
+    },
+    "expected": {
+        "~/.openclaw/openclaw.json": {
+            "models": {
+                "mode": "merge",
+                "providers": {
+                    "provider-a": {
+                        "baseUrl": "https://a.example.com",
+                        "apiKey": "key-a",
+                        "models": ["model-1"]
+                    },
+                    "provider-b": {
+                        "baseUrl": "https://b.example.com",
+                        "apiKey": "key-b",
+                        "models": ["model-2", "model-3"]
+                    }
+                }
+            }
+        }
+    }
+}

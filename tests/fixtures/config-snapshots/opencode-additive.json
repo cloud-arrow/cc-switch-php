@@ -1,0 +1,34 @@
+{
+    "description": "OpenCode additive mode - multiple providers coexist under provider key",
+    "input": {
+        "providers": [
+            {
+                "id": "openai-provider",
+                "app_type": "opencode",
+                "name": "OpenAI",
+                "settings_config": "{\"baseURL\":\"https://api.openai.com/v1\",\"apiKey\":\"sk-openai\"}"
+            },
+            {
+                "id": "anthropic-provider",
+                "app_type": "opencode",
+                "name": "Anthropic",
+                "settings_config": "{\"baseURL\":\"https://api.anthropic.com\",\"apiKey\":\"sk-ant\"}"
+            }
+        ]
+    },
+    "expected": {
+        "~/.config/opencode/opencode.json": {
+            "$schema": "https://opencode.ai/config.json",
+            "provider": {
+                "openai-provider": {
+                    "baseURL": "https://api.openai.com/v1",
+                    "apiKey": "sk-openai"
+                },
+                "anthropic-provider": {
+                    "baseURL": "https://api.anthropic.com",
+                    "apiKey": "sk-ant"
+                }
+            }
+        }
+    }
+}

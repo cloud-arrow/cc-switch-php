@@ -1,0 +1,17 @@
+{
+    "description": "Standard Codex provider writing auth.json and config.toml",
+    "input": {
+        "provider": {
+            "id": "codex-openai",
+            "app_type": "codex",
+            "name": "Codex OpenAI",
+            "settings_config": "{\"auth\":{\"OPENAI_API_KEY\":\"sk-openai-test\"},\"config\":\"model = \\\"o3\\\"\\napproval_policy = \\\"unless-allow-listed\\\"\\n\"}"
+        }
+    },
+    "expected": {
+        "~/.codex/auth.json": {
+            "OPENAI_API_KEY": "sk-openai-test"
+        },
+        "~/.codex/config.toml": "model = \"o3\"\napproval_policy = \"unless-allow-listed\"\n"
+    }
+}
