@@ -1,6 +1,6 @@
 # API 参考文档
 
-CC Switch PHP 后端提供 RESTful API，共 **约 100 个端点**，用于管理 Provider、MCP、代理、技能、Prompt 等资源。
+CC Switch PHP 后端提供 RESTful API，共 **88 个端点**，用于管理 Provider、MCP、代理、技能、Prompt 等资源。
 
 ## 基础信息
 
@@ -257,11 +257,18 @@ POST /api/universal-providers
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
+| `id` | string | 否 | UUID（默认自动生成） |
 | `name` | string | 是 | 名称 |
-| `settings_config` | string (JSON) | 否 | 配置 |
-| `category` | string | 否 | 分类 |
+| `provider_type` | string | 否 | 提供商类型（默认 `openai`） |
+| `apps` | string (JSON) | 否 | 启用的应用列表（默认 `{}`） |
+| `base_url` | string | 否 | API 基础 URL（默认空） |
+| `api_key` | string | 否 | API 密钥（默认空） |
+| `models` | string (JSON) | 否 | 支持的模型列表（默认 `{}`） |
+| `website_url` | string | 否 | 网站 URL |
 | `notes` | string | 否 | 备注 |
-| `meta` | string (JSON) | 否 | 元数据 |
+| `settings_config` | string (JSON) | 否 | 配置（默认 `{}`） |
+| `category` | string | 否 | 分类 |
+| `meta` | string (JSON) | 否 | 元数据（默认 `{}`） |
 
 **响应：** `201` + 创建的对象
 
@@ -271,7 +278,7 @@ POST /api/universal-providers
 PUT /api/universal-providers/{id}
 ```
 
-**可更新字段：** `name`, `settings_config`, `category`, `notes`, `meta`
+**可更新字段：** `name`, `provider_type`, `apps`, `base_url`, `api_key`, `models`, `website_url`, `notes`, `settings_config`, `category`, `meta`
 
 ### 删除
 
@@ -300,7 +307,23 @@ POST /api/mcp
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | `id` | string | 是 | 服务器标识 |
-| 其他字段 | — | 否 | MCP 服务器配置 |
+| `name` | string | 否 | 显示名称 |
+| `server_config` | string (JSON) | 否 | 服务器配置 JSON（包含 `type`, `command`, `args`, `url`, `env` 等） |
+| `enabled_claude` | int | 否 | 是否启用于 Claude（0/1） |
+| `enabled_codex` | int | 否 | 是否启用于 Codex（0/1） |
+| `enabled_gemini` | int | 否 | 是否启用于 Gemini（0/1） |
+| `enabled_opencode` | int | 否 | 是否启用于 OpenCode（0/1） |
+
+**server_config 格式示例（stdio 类型）：**
+
+```json
+{
+  "type": "stdio",
+  "command": "npx",
+  "args": ["-y", "@modelcontextprotocol/server-filesystem"],
+  "env": {"HOME": "/home/user"}
+}
+```
 
 **响应：** 更新后的 MCP 服务器对象
 

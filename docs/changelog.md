@@ -1,5 +1,31 @@
 # CC Switch PHP 更新日志
 
+## v1.1.0
+
+### 新增
+
+- **Playwright 浏览器 E2E 测试** — 31 个自动化测试覆盖 Web UI 全部 7 个标签页（Providers、MCP、Proxy、Prompts、Settings、Usage、Navigation），使用 `@playwright/test` 框架
+- **`--host` 选项** — `serve` 命令新增 `--host` 参数，设为 `0.0.0.0` 可远程访问 Web UI
+- **GitHub Actions CI/CD** — 自动化测试（PHPStan + PHPUnit）和多平台 Release 构建
+- **数据库迁移 015** — 为 `universal_providers` 表添加 `settings_config`、`category`、`meta` 列
+
+### 修复
+
+- **MCP 添加 UI Bug** — Web UI `addMcp()` 未生成 `id` 且未将 command/args 打包为 `server_config` JSON，导致添加 MCP Server 失败
+- **Prompt 保存 UI Bug** — Web UI `savePrompt()` 发送 `title` 字段，但 API 期望 `name` 字段
+- **Migrator phar 兼容性** — `glob()` 不支持 `phar://` 路径，改用 `scandir()` 确保独立二进制内的迁移文件可被正确发现
+- **UniversalProviderController** — `add()` 方法未传递 `provider_type`、`base_url`、`api_key` 等 NOT NULL 列的默认值，导致插入失败
+- **独立二进制静态资源** — 修复 phar 包内静态文件无法正确 serve 的问题
+- **Gemini Provider API Key** — 修复添加 Gemini Provider 时 API Key 未写入 `.env` 的问题
+
+### 技术栈更新
+
+- 新增 `package.json`、`playwright.config.mjs` 用于 UI 测试
+- 测试套件：791 PHPUnit + 31 Playwright = 822 个测试用例
+- CLI 命令：22 个，Service：21 个，Controller：19 个，API 路由：88 个
+
+---
+
 ## v1.0.0
 
 CC Switch PHP 的首个正式版本。本项目是 [CC Switch](https://github.com/nicepkg/cc-switch)（原 Tauri 桌面应用）的 PHP 重新实现版本，使用 PHP + Swoole 替代 Tauri，提供完整的 CLI 和 Web UI 管理能力。
@@ -24,7 +50,7 @@ CC Switch PHP 的首个正式版本。本项目是 [CC Switch](https://github.co
 ### CLI 工具
 
 - 基于 Symfony Console 的完整命令行工具集
-- 21 个 CLI 命令覆盖所有核心功能
+- 22 个 CLI 命令覆盖所有核心功能
 - 命令分组：`serve`、`provider:*`、`mcp:*`、`proxy:*`、`sync:*`、`backup`、`import`/`export`、`db:*`、`speedtest`、`env:check`、`migrate`
 
 ### API 代理服务器

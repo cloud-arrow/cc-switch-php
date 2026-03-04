@@ -112,6 +112,7 @@ cc-switch provider:switch claude <provider-id>
 |------|------|
 | `serve` | 启动 Web UI 服务器 |
 | | `--port, -p`：Web UI 端口（默认 `8080`）|
+| | `--host`：监听地址（默认 `127.0.0.1`，设为 `0.0.0.0` 可远程访问）|
 | | `--with-proxy`：同时启动代理服务器 |
 | | `--proxy-port`：代理端口（默认 `15721`）|
 

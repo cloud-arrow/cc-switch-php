@@ -56,7 +56,7 @@ cc-switch-php/
 ├── config/
 │   ├── defaults.php            # 默认配置值
 │   └── presets/                # Provider 预设模板
-├── migrations/                 # SQLite 数据库迁移文件（001-014）
+├── migrations/                 # SQLite 数据库迁移文件（001-015）
 │   ├── 001_create_providers.sql
 │   ├── 002_create_provider_endpoints.sql
 │   ├── 003_create_universal_providers.sql
@@ -70,7 +70,8 @@ cc-switch-php/
 │   ├── 011_create_request_logs.sql
 │   ├── 012_create_failover_queue.sql
 │   ├── 013_create_model_pricing.sql
-│   └── 014_create_stream_check_logs.sql
+│   ├── 014_create_stream_check_logs.sql
+│   └── 015_alter_universal_providers.sql
 ├── public/                     # 前端静态资源（SPA）
 ├── src/
 │   ├── App.php                 # 应用引导类（数据库初始化、迁移）
@@ -122,8 +123,8 @@ cc-switch-php/
 │   │   └── SkillImporter.php
 │   ├── Http/
 │   │   ├── Server.php                  # Swoole HTTP 服务器
-│   │   ├── Router.php                  # FastRoute 路由定义（约 100 个端点）
-│   │   └── Controller/                 # API 控制器（17 个）
+│   │   ├── Router.php                  # FastRoute 路由定义（88 个端点）
+│   │   └── Controller/                 # API 控制器（19 个）
 │   ├── Model/                  # 领域模型（值对象）
 │   │   ├── AppType.php                 # 应用类型枚举
 │   │   ├── Provider.php
@@ -150,7 +151,7 @@ cc-switch-php/
 │   │   ├── UsageLogger.php             # 用量日志记录
 │   │   ├── ThinkingBudgetRectifier.php # thinking budget 纠正
 │   │   └── ThinkingSignatureRectifier.php # thinking 签名纠正
-│   ├── Service/                # 业务逻辑层（19 个 Service）
+│   ├── Service/                # 业务逻辑层（21 个 Service）
 │   └── Util/
 │       └── AtomicFile.php              # 原子文件写入
 ├── tests/
@@ -199,18 +200,20 @@ php vendor/bin/phpstan analyse
 
 ### 测试结构
 
-| 目录 | 类型 | 测试类数 | 说明 |
+| 目录 | 类型 | 测试类/文件数 | 说明 |
 |------|------|----------|------|
 | `tests/Unit/` | 单元测试 | ~52 | 隔离测试 Service、Model、工具类 |
 | `tests/Integration/` | 集成测试 | ~12 | 含数据库操作的跨层测试 |
-| `tests/E2E/` | 端到端测试 | 1 | 完整请求流程测试 |
+| `tests/E2E/` | 端到端测试 (PHP) | 1 | 完整请求流程测试 |
+| `tests/E2E/ui/` | 浏览器 E2E 测试 | 8 | Playwright 驱动的 UI 自动化测试 |
 
-总计约 **810 个测试用例**。
+- PHPUnit 测试：约 **791 个测试用例**
+- Playwright UI 测试：**31 个测试用例**
 
-### 运行测试
+### 运行 PHPUnit 测试
 
 ```bash
-# 运行全部测试
+# 运行全部 PHPUnit 测试
 php vendor/bin/phpunit
 
 # 运行单元测试
@@ -228,6 +231,46 @@ php vendor/bin/phpunit tests/Unit/CircuitBreakerTest.php
 # 输出覆盖率（需要 Xdebug 或 PCOV）
 php vendor/bin/phpunit --coverage-text
 ```
+
+### 运行 Playwright UI 测试
+
+项目使用 [Playwright](https://playwright.dev/) 进行浏览器 UI 自动化测试，覆盖 Web UI 全部 7 个标签页的交互功能。
+
+**前置条件：** 需要先启动服务器。
+
+```bash
+# 安装依赖（首次）
+npm install
+npx playwright install chromium
+
+# 启动服务器
+php bin/cc-switch serve --port 8090 &
+
+# 运行 UI 测试（无头模式）
+npm run test:ui
+
+# 运行 UI 测试（有头模式，可视化调试）
+npm run test:ui:headed
+
+# 指定其他端口
+BASE_URL=http://127.0.0.1:9090 npx playwright test
+```
+
+**测试文件说明：**
+
+| 文件 | 测试数 | 覆盖内容 |
+|------|--------|----------|
+| `page-load.spec.mjs` | 6 | 页面加载、Alpine.js 初始化、导航栏、资源加载 |
+| `providers.spec.mjs` | 5 | Provider 列表、应用切换、添加/编辑/删除/切换 Provider |
+| `mcp.spec.mjs` | 3 | MCP 页面渲染、添加 MCP Server、同步 |
+| `proxy.spec.mjs` | 4 | 代理状态面板、配置复选框/数值输入、保存配置 |
+| `prompts.spec.mjs` | 3 | Prompt 列表渲染、添加/编辑 Prompt |
+| `settings.spec.mjs` | 3 | 设置表单渲染、主题选择器、保存设置 |
+| `usage.spec.mjs` | 3 | 统计卡片渲染、标签内容、时间段过滤 |
+| `navigation.spec.mjs` | 3 | 全部 7 个标签可导航、快速切换不崩溃、Skills 内容 |
+| `helpers.mjs` | — | 共享工具函数（navTo、dialogFill、tableHasRow 等） |
+
+**配置文件：** `playwright.config.mjs`（根目录），测试产物输出到 `tests/E2E/ui/results/`。
 
 ---
 
@@ -475,31 +518,22 @@ curl http://127.0.0.1:8080/api/tags
 
 ---
 
-## CI/CD 建议
+## CI/CD
 
-项目目前无 CI 配置，建议添加 GitHub Actions：
+项目已配置 GitHub Actions，位于 `.github/workflows/`：
 
-```yaml
-# .github/workflows/ci.yml
-name: CI
-on: [push, pull_request]
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.3'
-          extensions: swoole, pdo_sqlite
-      - run: composer install
-      - run: php vendor/bin/phpstan analyse
-      - run: php vendor/bin/phpunit
-```
+### CI 测试流程
 
-### 建议的 CI 流程
+每次 push 和 pull request 自动运行：
 
-1. **Lint** — `phpstan analyse`（Level 5）
-2. **Test** — `phpunit`（全部测试套件）
-3. **Build** — `./build.sh`（仅 release 分支）
-4. **Release** — 上传 `build/cc-switch` 到 GitHub Releases
+1. **PHPStan 静态分析** — Level 5
+2. **PHPUnit 测试** — 全部测试套件（Unit + Integration + E2E）
+
+### Release 构建流程
+
+通过 `workflow_dispatch` 手动触发或 tag 推送自动触发：
+
+1. 在 Linux（x86_64/aarch64）和 macOS（x86_64/aarch64）原生 runner 上构建
+2. 使用 `static-php-cli` 下载含 swoole + pdo_sqlite 的 micro.sfx
+3. 通过 `box compile` 编译 .phar 并合并为独立二进制
+4. 上传构建产物到 GitHub Releases
