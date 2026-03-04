@@ -1,0 +1,85 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build standalone binaries
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          tools: composer
+          extensions: pdo_sqlite, tokenizer, mbstring, filter, zlib
+
+      - name: Install dependencies
+        run: composer install --no-dev --optimize-autoloader --no-interaction --ignore-platform-reqs
+
+      - name: Download Box
+        run: |
+          curl -fSL -o box.phar https://github.com/box-project/box/releases/download/4.6.6/box.phar
+          chmod +x box.phar
+
+      - name: Compile .phar
+        run: php box.phar compile
+
+      - name: Download micro.sfx for all platforms
+        run: |
+          BASE_URL="https://dl.static-php.dev/static-php-cli/common"
+          mkdir -p build/sfx
+
+          for target in linux-x86_64 linux-aarch64 macos-x86_64 macos-aarch64; do
+            echo "==> Downloading micro.sfx for ${target} ..."
+            curl -fSL -o "build/sfx/${target}.tar.gz" \
+              "${BASE_URL}/php-8.3-micro-${target}.tar.gz"
+            mkdir -p "build/sfx/${target}"
+            tar -xzf "build/sfx/${target}.tar.gz" -C "build/sfx/${target}"
+          done
+
+      - name: Build binaries for all platforms
+        run: |
+          VERSION="${GITHUB_REF_NAME}"
+
+          for target in linux-x86_64 linux-aarch64 macos-x86_64 macos-aarch64; do
+            SFX=$(find "build/sfx/${target}" -name 'micro.sfx' -type f | head -1)
+            if [ -z "${SFX}" ]; then
+              echo "Error: micro.sfx not found for ${target}"
+              exit 1
+            fi
+
+            OUTPUT="build/cc-switch-${VERSION}-${target}"
+            cat "${SFX}" "build/cc-switch.phar" > "${OUTPUT}"
+            chmod +x "${OUTPUT}"
+
+            echo "==> Built: ${OUTPUT} ($(du -h "${OUTPUT}" | cut -f1))"
+          done
+
+      - name: Generate checksums
+        run: |
+          cd build
+          VERSION="${GITHUB_REF_NAME}"
+          sha256sum cc-switch-${VERSION}-* > checksums-${VERSION}.sha256
+          cat checksums-${VERSION}.sha256
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            build/cc-switch-${{ github.ref_name }}-linux-x86_64
+            build/cc-switch-${{ github.ref_name }}-linux-aarch64
+            build/cc-switch-${{ github.ref_name }}-macos-x86_64
+            build/cc-switch-${{ github.ref_name }}-macos-aarch64
+            build/checksums-${{ github.ref_name }}.sha256
