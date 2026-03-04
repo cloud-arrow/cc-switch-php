@@ -33,6 +33,7 @@ class Server
         private readonly int $webPort = 8080,
         private readonly bool $withProxy = false,
         private readonly int $proxyPort = 15721,
+        private readonly string $host = '127.0.0.1',
     ) {
         $this->router = new Router($this->app);
         $this->publicDir = dirname(__DIR__, 2) . '/public';
@@ -43,7 +44,7 @@ class Server
      */
     public function start(): void
     {
-        $server = new SwooleServer('127.0.0.1', $this->webPort);
+        $server = new SwooleServer($this->host, $this->webPort);
 
         $server->set([
             'worker_num' => 2,
@@ -59,9 +60,9 @@ class Server
         ]);
 
         $server->on('start', function (SwooleServer $server) {
-            echo "CC Switch server started on http://127.0.0.1:{$this->webPort}\n";
+            echo "CC Switch server started on http://{$this->host}:{$this->webPort}\n";
             if ($this->withProxy) {
-                echo "Proxy server attached on 127.0.0.1:{$this->proxyPort}\n";
+                echo "Proxy server attached on {$this->host}:{$this->proxyPort}\n";
             }
         });
 
@@ -162,7 +163,7 @@ class Server
         if ($this->withProxy) {
             $proxyServer = new ProxyServer(
                 $this->app->getMedoo(),
-                '127.0.0.1',
+                $this->host,
                 $this->proxyPort,
                 $this->app->getBaseDir(),
             );

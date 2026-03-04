@@ -29,6 +29,7 @@ class ServeCommand extends Command
         $this
             ->setName('serve')
             ->setDescription('Start the web UI server')
+            ->addOption('host', 'H', InputOption::VALUE_REQUIRED, 'Listen host', '127.0.0.1')
             ->addOption('port', 'p', InputOption::VALUE_REQUIRED, 'Web UI port', '8080')
             ->addOption('with-proxy', null, InputOption::VALUE_NONE, 'Also start the proxy server as a sub-listener')
             ->addOption('proxy-port', null, InputOption::VALUE_REQUIRED, 'Proxy server port', '15721');
@@ -36,13 +37,14 @@ class ServeCommand extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
+        $host = $input->getOption('host');
         $port = (int) $input->getOption('port');
         $withProxy = (bool) $input->getOption('with-proxy');
         $proxyPort = (int) $input->getOption('proxy-port');
 
-        $output->writeln("<info>Starting CC Switch server on http://127.0.0.1:{$port}</info>");
+        $output->writeln("<info>Starting CC Switch server on http://{$host}:{$port}</info>");
         if ($withProxy) {
-            $output->writeln("<info>Proxy server will be attached on 127.0.0.1:{$proxyPort}</info>");
+            $output->writeln("<info>Proxy server will be attached on {$host}:{$proxyPort}</info>");
         }
 
         $server = new Server(
@@ -50,6 +52,7 @@ class ServeCommand extends Command
             $port,
             $withProxy,
             $proxyPort,
+            $host,
         );
 
         // This call blocks until the server shuts down
