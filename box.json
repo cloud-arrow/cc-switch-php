@@ -7,8 +7,13 @@
             "in": ["vendor"],
             "name": "*.php",
             "exclude": ["tests", "Tests", "test", "Test", "docs", "doc"]
+        },
+        {
+            "in": ["vendor/symfony/console/Resources"],
+            "ignoreDotFiles": false
         }
     ],
     "compression": "GZ",
-    "compactors": ["KevinGH\\Box\\Compactor\\Php"]
+    "compactors": ["KevinGH\\Box\\Compactor\\Php"],
+    "check-requirements": false
 }

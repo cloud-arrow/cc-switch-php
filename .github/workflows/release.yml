@@ -8,10 +8,33 @@ on:
 permissions:
   contents: write
 
+env:
+  SPC_PHP_VERSION: "8.3"
+  SPC_EXTENSIONS: "swoole,pdo_sqlite,phar,curl,openssl,mbstring,tokenizer,filter,zlib,sockets,pcntl,posix,ctype,fileinfo,session"
+
 jobs:
   build:
-    name: Build standalone binaries
-    runs-on: ubuntu-latest
+    name: Build (${{ matrix.target }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - target: linux-x86_64
+            runner: ubuntu-latest
+            spc_os: linux
+            spc_arch: x86_64
+          - target: linux-aarch64
+            runner: ubuntu-latest
+            spc_os: linux
+            spc_arch: aarch64
+          - target: macos-x86_64
+            runner: macos-13
+            spc_os: macos
+            spc_arch: x86_64
+          - target: macos-aarch64
+            runner: macos-14
+            spc_os: macos
+            spc_arch: aarch64
 
     steps:
       - name: Checkout
@@ -35,51 +58,87 @@ jobs:
       - name: Compile .phar
         run: php box.phar compile
 
-      - name: Download micro.sfx for all platforms
+      - name: Install build tools (Linux)
+        if: runner.os == 'Linux'
         run: |
-          BASE_URL="https://dl.static-php.dev/static-php-cli/common"
-          mkdir -p build/sfx
+          sudo apt-get update
+          sudo apt-get install -y re2c flex cmake build-essential
 
-          for target in linux-x86_64 linux-aarch64 macos-x86_64 macos-aarch64; do
-            echo "==> Downloading micro.sfx for ${target} ..."
-            curl -fSL -o "build/sfx/${target}.tar.gz" \
-              "${BASE_URL}/php-8.3-micro-${target}.tar.gz"
-            mkdir -p "build/sfx/${target}"
-            tar -xzf "build/sfx/${target}.tar.gz" -C "build/sfx/${target}"
-          done
+      - name: Install build tools (macOS)
+        if: runner.os == 'macOS'
+        run: brew install re2c flex cmake
 
-      - name: Build binaries for all platforms
+      - name: Download spc
+        run: |
+          curl -fsSL -o spc.tgz \
+            "https://dl.static-php.dev/static-php-cli/spc-bin/nightly/spc-${{ matrix.spc_os }}-${{ matrix.spc_arch }}.tar.gz"
+          tar -xzf spc.tgz
+          chmod +x spc
+
+      - name: Download PHP sources
+        run: |
+          PHP_TAG=$(curl -sfSL "https://api.github.com/repos/php/php-src/tags?per_page=20" \
+            | grep -o '"name": "php-${{ env.SPC_PHP_VERSION }}[^"]*"' \
+            | head -1 | grep -o 'php-[0-9.]*') || true
+
+          CUSTOM_URL_FLAG=""
+          if ! curl -sfSL --max-time 10 "https://www.php.net/releases/index.php?json&version=${{ env.SPC_PHP_VERSION }}" > /dev/null 2>&1; then
+            echo "php.net unreachable, using GitHub mirror"
+            CUSTOM_URL_FLAG="--custom-url=php-src:https://github.com/php/php-src/archive/refs/tags/${PHP_TAG:-php-${{ env.SPC_PHP_VERSION }}.30}.tar.gz"
+          fi
+
+          ./spc download \
+            --with-php="${{ env.SPC_PHP_VERSION }}" \
+            --for-extensions="${{ env.SPC_EXTENSIONS }}" \
+            --prefer-pre-built \
+            ${CUSTOM_URL_FLAG}
+
+      - name: Build micro.sfx
+        run: |
+          ./spc build "${{ env.SPC_EXTENSIONS }}" --build-micro
+
+      - name: Create standalone binary
         run: |
           VERSION="${GITHUB_REF_NAME}"
+          MICRO_SFX="$(find buildroot -name 'micro.sfx' -type f | head -1)"
+          if [ -z "${MICRO_SFX}" ]; then
+            echo "Error: micro.sfx not found"
+            exit 1
+          fi
 
-          for target in linux-x86_64 linux-aarch64 macos-x86_64 macos-aarch64; do
-            SFX=$(find "build/sfx/${target}" -name 'micro.sfx' -type f | head -1)
-            if [ -z "${SFX}" ]; then
-              echo "Error: micro.sfx not found for ${target}"
-              exit 1
-            fi
+          OUTPUT="build/cc-switch-${VERSION}-${{ matrix.target }}"
+          cat "${MICRO_SFX}" build/cc-switch.phar > "${OUTPUT}"
+          chmod +x "${OUTPUT}"
+          echo "Built: ${OUTPUT} ($(du -h "${OUTPUT}" | cut -f1))"
 
-            OUTPUT="build/cc-switch-${VERSION}-${target}"
-            cat "${SFX}" "build/cc-switch.phar" > "${OUTPUT}"
-            chmod +x "${OUTPUT}"
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cc-switch-${{ matrix.target }}
+          path: build/cc-switch-${{ github.ref_name }}-${{ matrix.target }}
 
-            echo "==> Built: ${OUTPUT} ($(du -h "${OUTPUT}" | cut -f1))"
-          done
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
 
       - name: Generate checksums
         run: |
-          cd build
-          VERSION="${GITHUB_REF_NAME}"
-          sha256sum cc-switch-${VERSION}-* > checksums-${VERSION}.sha256
-          cat checksums-${VERSION}.sha256
+          cd artifacts
+          sha256sum cc-switch-* > checksums-${{ github.ref_name }}.sha256
+          cat checksums-${{ github.ref_name }}.sha256
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
           files: |
-            build/cc-switch-${{ github.ref_name }}-linux-x86_64
-            build/cc-switch-${{ github.ref_name }}-linux-aarch64
-            build/cc-switch-${{ github.ref_name }}-macos-x86_64
-            build/cc-switch-${{ github.ref_name }}-macos-aarch64
-            build/checksums-${{ github.ref_name }}.sha256
+            artifacts/cc-switch-${{ github.ref_name }}-*
+            artifacts/checksums-${{ github.ref_name }}.sha256
