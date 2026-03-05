@@ -37,7 +37,7 @@ function ccSwitch() {
         providerForm: {
             name: '', category: '', notes: '', website_url: '', icon: '', icon_color: '', rawJson: '{}',
             claude: { apiKey: '', baseUrl: '', model: '', reasoningModel: '', haikuModel: '', sonnetModel: '', opusModel: '' },
-            codex: { apiKey: '', model: '', tomlConfig: '' },
+            codex: { apiKey: '', baseUrl: '', model: '', providerName: '', tomlConfig: '' },
             gemini: { apiKey: '', baseUrl: '', model: '' },
             opencode: { npmPackage: '@ai-sdk/openai', apiKey: '', baseUrl: '', model: '', extraOptions: [] },
             openclaw: { api: 'openai-completions', baseUrl: '', apiKey: '', models: [] },
@@ -241,9 +241,12 @@ function ccSwitch() {
                 this.providerForm.claude.opusModel = env.ANTHROPIC_DEFAULT_OPUS_MODEL || '';
             } else if (this.currentApp === 'codex') {
                 const auth = preset.auth || {};
+                const tomlParsed = this.parseCodexToml(preset.config || '');
                 this.providerForm.codex.apiKey = auth.OPENAI_API_KEY || '';
+                this.providerForm.codex.baseUrl = tomlParsed.baseUrl || '';
+                this.providerForm.codex.model = tomlParsed.model || '';
+                this.providerForm.codex.providerName = tomlParsed.providerName || '';
                 this.providerForm.codex.tomlConfig = preset.config || '';
-                this.providerForm.codex.model = '';
             } else if (this.currentApp === 'gemini') {
                 const env = preset.settingsConfig?.env || {};
                 this.providerForm.gemini.apiKey = env.GOOGLE_API_KEY || env.GEMINI_API_KEY || '';
@@ -301,9 +304,12 @@ function ccSwitch() {
                     opusModel: env.ANTHROPIC_DEFAULT_OPUS_MODEL || '',
                 };
             } else if (this.currentApp === 'codex') {
+                const tomlParsed = this.parseCodexToml(cfg.config || '');
                 this.providerForm.codex = {
-                    apiKey: cfg.auth?.OPENAI_API_KEY || '',
-                    model: '',
+                    apiKey: cfg.auth?.OPENAI_API_KEY || cfg.env?.OPENAI_API_KEY || '',
+                    baseUrl: cfg.env?.OPENAI_BASE_URL || tomlParsed.baseUrl || '',
+                    model: tomlParsed.model || '',
+                    providerName: tomlParsed.providerName || '',
                     tomlConfig: cfg.config || '',
                 };
             } else if (this.currentApp === 'gemini') {
@@ -350,7 +356,17 @@ function ccSwitch() {
                 const c = this.providerForm.codex;
                 const auth = {};
                 if (c.apiKey) auth.OPENAI_API_KEY = c.apiKey;
-                return JSON.stringify({ auth, config: c.tomlConfig || '' });
+                const env = {};
+                if (c.apiKey) env.OPENAI_API_KEY = c.apiKey;
+                if (c.baseUrl) env.OPENAI_BASE_URL = c.baseUrl;
+                // Use custom TOML if provided, otherwise auto-generate
+                let toml = c.tomlConfig || '';
+                if (!toml.trim() && c.baseUrl) {
+                    const pn = c.providerName || this.deriveProviderName(c.baseUrl);
+                    const model = c.model || 'gpt-5.2';
+                    toml = `model_provider = "${pn}"\nmodel = "${model}"\nmodel_reasoning_effort = "high"\ndisable_response_storage = true\n\n[model_providers.${pn}]\nname = "${pn}"\nbase_url = "${c.baseUrl}"\nwire_api = "responses"\nrequires_openai_auth = true`;
+                }
+                return JSON.stringify({ auth, env, config: toml });
             } else if (app === 'gemini') {
                 const c = this.providerForm.gemini;
                 const env = {};
@@ -373,6 +389,28 @@ function ccSwitch() {
                 });
             }
             return this.providerForm.rawJson || '{}';
+        },
+
+        deriveProviderName(baseUrl) {
+            if (!baseUrl) return 'custom';
+            try {
+                const host = new URL(baseUrl).hostname.replace(/^(www|api)\./, '').split('.')[0];
+                // Avoid reserved names that conflict with Codex built-in providers
+                const reserved = ['openai', 'azure', 'anthropic'];
+                return reserved.includes(host) ? host + '-custom' : (host || 'custom');
+            } catch { return 'custom'; }
+        },
+
+        parseCodexToml(toml) {
+            if (!toml) return {};
+            const result = {};
+            const providerMatch = toml.match(/model_provider\s*=\s*"([^"]+)"/);
+            if (providerMatch) result.providerName = providerMatch[1];
+            const modelMatch = toml.match(/^model\s*=\s*"([^"]+)"/m);
+            if (modelMatch) result.model = modelMatch[1];
+            const baseUrlMatch = toml.match(/base_url\s*=\s*"([^"]+)"/);
+            if (baseUrlMatch) result.baseUrl = baseUrlMatch[1];
+            return result;
         },
 
         parseConfig(raw) {
@@ -422,7 +460,7 @@ function ccSwitch() {
             this.providerForm = {
                 name: '', category: '', notes: '', website_url: '', icon: '', icon_color: '', rawJson: '{}',
                 claude: { apiKey: '', baseUrl: '', model: '', reasoningModel: '', haikuModel: '', sonnetModel: '', opusModel: '' },
-                codex: { apiKey: '', model: '', tomlConfig: '' },
+                codex: { apiKey: '', baseUrl: '', model: '', providerName: '', tomlConfig: '' },
                 gemini: { apiKey: '', baseUrl: '', model: '' },
                 opencode: { npmPackage: '@ai-sdk/openai', apiKey: '', baseUrl: '', model: '', extraOptions: [] },
                 openclaw: { api: 'openai-completions', baseUrl: '', apiKey: '', models: [] },

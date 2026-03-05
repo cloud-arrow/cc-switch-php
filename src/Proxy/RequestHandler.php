@@ -252,8 +252,15 @@ class RequestHandler
             $this->circuitBreaker->recordSuccess($provider->id, $appType);
         }
 
-        // Parse usage from stream events
-        $usage = $this->usageLogger->parseClaudeStreamUsage($result['events']);
+        // Parse usage from stream events based on app type
+        $usage = match ($appType) {
+            'codex', 'opencode', 'openclaw' => $this->usageLogger->parseOpenAIStreamUsage($result['events']),
+            default => $this->usageLogger->parseClaudeStreamUsage($result['events']),
+        };
+        // Fallback: if Claude parser found nothing, try OpenAI parser
+        if ($usage['input_tokens'] === 0 && $usage['output_tokens'] === 0) {
+            $usage = $this->usageLogger->parseOpenAIStreamUsage($result['events']);
+        }
 
         // Log usage
         if ($config->enable_logging) {
@@ -609,7 +616,11 @@ class RequestHandler
         if (!empty($meta->customEndpoints)) {
             $endpoint = $meta->customEndpoints[0]['url'] ?? null;
             if ($endpoint !== null) {
-                return rtrim($endpoint, '/') . $requestPath;
+                $ep = rtrim($endpoint, '/');
+                if (str_ends_with($ep, '/v1') && str_starts_with($requestPath, '/v1/')) {
+                    $requestPath = substr($requestPath, 3);
+                }
+                return $ep . $requestPath;
             }
         }
 
@@ -622,7 +633,12 @@ class RequestHandler
             ?? null;
 
         if ($baseUrl !== null) {
-            return rtrim($baseUrl, '/') . $requestPath;
+            $base = rtrim($baseUrl, '/');
+            // Avoid path duplication: if base ends with /v1 and request starts with /v1/
+            if (str_ends_with($base, '/v1') && str_starts_with($requestPath, '/v1/')) {
+                $requestPath = substr($requestPath, 3); // strip leading /v1
+            }
+            return $base . $requestPath;
         }
 
         // Default API endpoints

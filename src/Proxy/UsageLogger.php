@@ -171,13 +171,39 @@ class UsageLogger
      */
     public function parseOpenAIStreamUsage(array $events): array
     {
-        // OpenAI puts usage in the last chunk
+        // Search from last event backwards for usage data
         for ($i = count($events) - 1; $i >= 0; $i--) {
-            $usage = $events[$i]['usage'] ?? null;
+            $event = $events[$i];
+
+            // Chat Completions format: usage at top level with prompt_tokens/completion_tokens
+            $usage = $event['usage'] ?? null;
             if ($usage !== null) {
+                // Chat Completions uses prompt_tokens/completion_tokens
+                if (isset($usage['prompt_tokens'])) {
+                    return [
+                        'input_tokens' => (int) ($usage['prompt_tokens'] ?? 0),
+                        'output_tokens' => (int) ($usage['completion_tokens'] ?? 0),
+                        'cache_read_tokens' => 0,
+                        'cache_creation_tokens' => 0,
+                    ];
+                }
+                // Responses API uses input_tokens/output_tokens
+                if (isset($usage['input_tokens'])) {
+                    return [
+                        'input_tokens' => (int) ($usage['input_tokens'] ?? 0),
+                        'output_tokens' => (int) ($usage['output_tokens'] ?? 0),
+                        'cache_read_tokens' => 0,
+                        'cache_creation_tokens' => 0,
+                    ];
+                }
+            }
+
+            // Responses API: usage nested in response.completed event
+            $responseUsage = $event['response']['usage'] ?? null;
+            if ($responseUsage !== null) {
                 return [
-                    'input_tokens' => (int) ($usage['prompt_tokens'] ?? 0),
-                    'output_tokens' => (int) ($usage['completion_tokens'] ?? 0),
+                    'input_tokens' => (int) ($responseUsage['input_tokens'] ?? 0),
+                    'output_tokens' => (int) ($responseUsage['output_tokens'] ?? 0),
                     'cache_read_tokens' => 0,
                     'cache_creation_tokens' => 0,
                 ];

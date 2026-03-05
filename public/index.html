@@ -287,12 +287,21 @@
                         <input type="password" x-model="providerForm.codex.apiKey" placeholder="sk-..." class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
                     </div>
                     <div>
+                        <label class="block text-xs text-gray-500 mb-1">Base URL</label>
+                        <input type="text" x-model="providerForm.codex.baseUrl" placeholder="https://api.openai.com/v1" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div>
                         <label class="block text-xs text-gray-500 mb-1">Model</label>
                         <input type="text" x-model="providerForm.codex.model" placeholder="gpt-5.2" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
                     </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Provider Name</label>
+                        <input type="text" x-model="providerForm.codex.providerName" placeholder="custom" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
+                        <p class="text-xs text-gray-600 mt-1">Avoid "openai" (conflicts with built-in)</p>
+                    </div>
                     <div class="sm:col-span-2">
-                        <label class="block text-xs text-gray-500 mb-1">TOML Configuration</label>
-                        <textarea x-model="providerForm.codex.tomlConfig" rows="8" placeholder='model_provider = "openai"&#10;model = "gpt-5.2"&#10;...' class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 mono-textarea"></textarea>
+                        <label class="block text-xs text-gray-500 mb-1">TOML Configuration <span class="text-gray-600">(auto-generated if empty)</span></label>
+                        <textarea x-model="providerForm.codex.tomlConfig" rows="8" placeholder="Leave empty to auto-generate from above fields" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 mono-textarea"></textarea>
                     </div>
                 </div>
             </div>
