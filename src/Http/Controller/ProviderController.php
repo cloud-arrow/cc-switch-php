@@ -38,11 +38,19 @@ class ProviderController
     public function add(array $vars, array $body): array
     {
         $id = $body['id'] ?? Uuid::uuid4()->toString();
+        $settingsConfig = $body['settings_config'] ?? '{}';
+        if (is_array($settingsConfig)) {
+            $settingsConfig = json_encode($settingsConfig, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        }
+        $meta = $body['meta'] ?? '{}';
+        if (is_array($meta)) {
+            $meta = json_encode($meta, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        }
         $data = [
             'id' => $id,
             'app_type' => $vars['app'],
             'name' => $body['name'] ?? '',
-            'settings_config' => $body['settings_config'] ?? '{}',
+            'settings_config' => $settingsConfig,
             'website_url' => $body['website_url'] ?? null,
             'category' => $body['category'] ?? null,
             'created_at' => time(),
@@ -50,7 +58,7 @@ class ProviderController
             'notes' => $body['notes'] ?? null,
             'icon' => $body['icon'] ?? null,
             'icon_color' => $body['icon_color'] ?? null,
-            'meta' => $body['meta'] ?? '{}',
+            'meta' => $meta,
             'is_current' => 0,
             'in_failover_queue' => 0,
         ];
@@ -67,8 +75,28 @@ class ProviderController
 
         $allowed = ['name', 'settings_config', 'website_url', 'category', 'sort_index', 'notes', 'icon', 'icon_color', 'meta'];
         $data = array_intersect_key($body, array_flip($allowed));
+
+        // Ensure JSON fields are stored as strings
+        foreach (['settings_config', 'meta'] as $jsonField) {
+            if (isset($data[$jsonField]) && is_array($data[$jsonField])) {
+                $data[$jsonField] = json_encode($data[$jsonField], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            }
+        }
+
         if (!empty($data)) {
             $this->repo->update($vars['id'], $vars['app'], $data);
+
+            // Sync config file if this is the current provider
+            $app = AppType::tryFrom($vars['app']);
+            if ($app) {
+                $service = new ProviderService($this->repo);
+                $updated = $this->repo->get($vars['id'], $vars['app']);
+                if ($updated && !empty($updated['is_current'])) {
+                    $provider = Provider::fromRow($updated);
+                    $writer = \CcSwitch\ConfigWriter\WriterFactory::create($app);
+                    $writer->write($provider);
+                }
+            }
         }
         return ['status' => 200, 'body' => ['ok' => true]];
     }
@@ -81,7 +109,13 @@ class ProviderController
 
     public function switch(array $vars): array
     {
-        $this->repo->switchTo($vars['id'], $vars['app']);
+        $app = AppType::tryFrom($vars['app']);
+        if ($app) {
+            $service = new ProviderService($this->repo);
+            $service->switchTo($vars['id'], $app);
+        } else {
+            $this->repo->switchTo($vars['id'], $vars['app']);
+        }
         return ['status' => 200, 'body' => ['ok' => true]];
     }
 
@@ -103,16 +137,24 @@ class ProviderController
         $imported = 0;
         foreach ($providers as $p) {
             $appType = $p['app_type'] ?? 'claude';
+            $sc = $p['settings_config'] ?? '{}';
+            if (is_array($sc)) {
+                $sc = json_encode($sc, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            }
+            $mt = $p['meta'] ?? '{}';
+            if (is_array($mt)) {
+                $mt = json_encode($mt, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            }
             $data = [
                 'id' => $p['id'] ?? Uuid::uuid4()->toString(),
                 'app_type' => $appType,
                 'name' => $p['name'] ?? '',
-                'settings_config' => $p['settings_config'] ?? '{}',
+                'settings_config' => $sc,
                 'category' => $p['category'] ?? null,
                 'created_at' => time(),
                 'sort_index' => $p['sort_index'] ?? 0,
                 'notes' => $p['notes'] ?? null,
-                'meta' => $p['meta'] ?? '{}',
+                'meta' => $mt,
                 'is_current' => 0,
                 'in_failover_queue' => 0,
             ];
@@ -167,17 +209,7 @@ class ProviderController
 
     public function presets(array $vars): array
     {
-        // Return built-in provider presets for the given app type
-        $presets = match ($vars['app']) {
-            'claude' => [
-                ['name' => 'Anthropic (Official)', 'category' => 'official', 'settings_config' => '{"env":{"ANTHROPIC_API_KEY":""}}'],
-                ['name' => 'OpenRouter', 'category' => 'openrouter', 'settings_config' => '{"env":{"ANTHROPIC_API_KEY":"","ANTHROPIC_BASE_URL":"https://openrouter.ai/api"}}'],
-            ],
-            'codex' => [
-                ['name' => 'OpenAI (Official)', 'category' => 'official', 'settings_config' => '{"env":{"OPENAI_API_KEY":""}}'],
-            ],
-            default => [],
-        };
-        return $presets;
+        $app = AppType::tryFrom($vars['app']) ?? AppType::Claude;
+        return ProviderService::loadPresets($app);
     }
 }

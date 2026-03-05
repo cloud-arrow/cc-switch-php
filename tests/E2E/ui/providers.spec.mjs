@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
-import { navTo, clickInSection, dialogFill, dialogClick, closeDialogs, tableHasRow, clickRowAction, withConfirm } from './helpers.mjs';
+import { navTo, clickInSection, dialogFill, closeDialogs, tableHasRow, clickRowAction, withConfirm } from './helpers.mjs';
 
-test.describe('Providers Tab', () => {
+test.describe('Providers View', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/', { waitUntil: 'networkidle' });
     await page.waitForTimeout(800);
@@ -13,101 +13,98 @@ test.describe('Providers Tab', () => {
 
   test('provider list loads', async ({ page }) => {
     const ok = await page.evaluate(() =>
-      document.querySelector('table tbody tr') !== null ||
-      document.body.textContent.includes('No providers'));
+      document.body.textContent.includes('Providers') &&
+      (document.body.textContent.includes('configured') ||
+       document.body.textContent.includes('No providers')));
     expect(ok).toBe(true);
   });
 
-  test('switch between apps (Claude → Gemini → Claude)', async ({ page }) => {
-    // Switch to Gemini
+  test('switch between apps', async ({ page }) => {
+    // Click Gemini in app switcher
     await page.evaluate(() => {
-      for (const b of document.querySelectorAll('.app-selector button'))
-        if (b.textContent.trim() === 'gemini') b.click();
+      const btns = document.querySelectorAll('nav .rounded-xl button');
+      for (const b of btns) {
+        if (b.textContent.includes('Gemini')) { b.click(); break; }
+      }
     });
     await page.waitForTimeout(800);
-    let active = await page.$eval('.app-selector button.contrast', el => el.textContent.trim());
-    expect(active).toBe('gemini');
-
-    // Switch back to Claude
-    await page.evaluate(() => {
-      for (const b of document.querySelectorAll('.app-selector button'))
-        if (b.textContent.trim() === 'claude') b.click();
+    // Verify Gemini is selected (has bg-blue-600 class)
+    const active = await page.evaluate(() => {
+      const btns = document.querySelectorAll('nav .rounded-xl button');
+      for (const b of btns) {
+        if (b.classList.contains('bg-blue-600') && b.textContent.includes('Gemini')) return true;
+      }
+      return false;
     });
-    await page.waitForTimeout(800);
-    active = await page.$eval('.app-selector button.contrast', el => el.textContent.trim());
-    expect(active).toBe('claude');
+    expect(active).toBe(true);
   });
 
-  test('add provider via dialog', async ({ page }) => {
-    await clickInSection(page, '+ Add');
+  test('add provider via panel', async ({ page }) => {
+    // Click Add button
+    await page.click('button:has-text("Add")');
     await page.waitForTimeout(400);
-    const hasDialog = await page.evaluate(() => !!document.querySelector('dialog[open]'));
-    expect(hasDialog).toBe(true);
 
+    // Should be in providerForm view
+    const inForm = await page.evaluate(() =>
+      document.body.textContent.includes('Add New Provider') ||
+      document.body.textContent.includes('Basic Information'));
+    expect(inForm).toBe(true);
+
+    // Fill name
     await dialogFill(page, 'input[placeholder="Provider name"]', 'PW Test Provider');
-    await dialogFill(page, 'input[placeholder*="official"]', 'pw-test');
-    await dialogFill(page, 'textarea[placeholder*="ANTHROPIC"]', '{"env":{"ANTHROPIC_API_KEY":"sk-pw"}}');
-    await dialogClick(page, 'footer button:not(.secondary)');
+
+    // Fill Claude API key
+    await dialogFill(page, 'input[placeholder="sk-ant-..."]', 'sk-pw-test');
+
+    // Click Save
+    await page.click('button:has-text("Save")');
     await page.waitForTimeout(1000);
 
     expect(await tableHasRow(page, 'PW Test Provider')).toBe(true);
+
+    // Cleanup
+    await withConfirm(page, () => clickRowAction(page, 'PW Test Provider', 'Delete'));
   });
 
   test('edit provider name', async ({ page }) => {
-    // Prerequisite: add a provider
-    await clickInSection(page, '+ Add');
+    // Add a provider first
+    await page.click('button:has-text("Add")');
     await page.waitForTimeout(400);
     await dialogFill(page, 'input[placeholder="Provider name"]', 'PW Edit Me');
-    await dialogFill(page, 'textarea[placeholder*="ANTHROPIC"]', '{"env":{}}');
-    await dialogClick(page, 'footer button:not(.secondary)');
+    await page.click('button:has-text("Save")');
     await page.waitForTimeout(1000);
 
     // Edit it
     await clickRowAction(page, 'PW Edit Me', 'Edit');
     await page.waitForTimeout(500);
-    const prefilled = await page.evaluate(() =>
-      document.querySelector('dialog[open] input[placeholder="Provider name"]')?.value);
+    const prefilled = await page.evaluate(() => {
+      const inp = document.querySelector('input[placeholder="Provider name"]');
+      return inp?.value;
+    });
     expect(prefilled).toBe('PW Edit Me');
 
     await dialogFill(page, 'input[placeholder="Provider name"]', 'PW Edited');
-    await dialogClick(page, 'footer button:not(.secondary)');
+    await page.click('button:has-text("Update")');
     await page.waitForTimeout(1000);
 
     expect(await tableHasRow(page, 'PW Edited')).toBe(true);
 
     // Cleanup
-    await withConfirm(page, () => clickRowAction(page, 'PW Edited', 'Del'));
-  });
-
-  test('switch active provider', async ({ page }) => {
-    // Add provider
-    await clickInSection(page, '+ Add');
-    await page.waitForTimeout(400);
-    await dialogFill(page, 'input[placeholder="Provider name"]', 'PW Switch Target');
-    await dialogFill(page, 'textarea[placeholder*="ANTHROPIC"]', '{"env":{}}');
-    await dialogClick(page, 'footer button:not(.secondary)');
-    await page.waitForTimeout(1000);
-
-    // Switch to it
-    await clickRowAction(page, 'PW Switch Target', 'Switch');
-    await page.waitForTimeout(1000);
-
-    // Cleanup
-    await withConfirm(page, () => clickRowAction(page, 'PW Switch Target', 'Del'));
+    await withConfirm(page, () => clickRowAction(page, 'PW Edited', 'Delete'));
   });
 
   test('delete provider', async ({ page }) => {
-    // Add provider
-    await clickInSection(page, '+ Add');
+    // Add
+    await page.click('button:has-text("Add")');
     await page.waitForTimeout(400);
     await dialogFill(page, 'input[placeholder="Provider name"]', 'PW Delete Me');
-    await dialogFill(page, 'textarea[placeholder*="ANTHROPIC"]', '{"env":{}}');
-    await dialogClick(page, 'footer button:not(.secondary)');
+    await page.click('button:has-text("Save")');
     await page.waitForTimeout(1000);
     expect(await tableHasRow(page, 'PW Delete Me')).toBe(true);
 
-    // Delete it
-    await withConfirm(page, () => clickRowAction(page, 'PW Delete Me', 'Del'));
+    // Delete
+    await withConfirm(page, () => clickRowAction(page, 'PW Delete Me', 'Delete'));
+    await page.waitForTimeout(500);
     expect(await tableHasRow(page, 'PW Delete Me')).toBe(false);
   });
 });

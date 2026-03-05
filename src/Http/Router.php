@@ -46,6 +46,7 @@ class Router
             $r->addRoute('GET', '/api/mcp', ['McpController', 'list']);
             $r->addRoute('POST', '/api/mcp', ['McpController', 'upsert']);
             $r->addRoute('DELETE', '/api/mcp/{id}', ['McpController', 'delete']);
+            $r->addRoute('PUT', '/api/mcp/{id}', ['McpController', 'update']);
             $r->addRoute('POST', '/api/mcp/sync', ['McpController', 'sync']);
 
             // Proxy (6)
@@ -78,6 +79,7 @@ class Router
             $r->addRoute('GET', '/api/skills', ['SkillController', 'list']);
             $r->addRoute('POST', '/api/skills/install', ['SkillController', 'install']);
             $r->addRoute('DELETE', '/api/skills/{id}', ['SkillController', 'delete']);
+            $r->addRoute('PUT', '/api/skills/{id}', ['SkillController', 'update']);
             $r->addRoute('POST', '/api/skills/sync', ['SkillController', 'sync']);
 
             // Prompts (4)

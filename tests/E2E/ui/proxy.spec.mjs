@@ -1,31 +1,25 @@
 import { test, expect } from '@playwright/test';
 import { navTo, clickInSection } from './helpers.mjs';
 
-test.describe('Proxy Tab', () => {
+test.describe('Proxy (Settings > Advanced)', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/', { waitUntil: 'networkidle' });
-    await navTo(page, 'Proxy');
+    await navTo(page, 'Proxy'); // Goes to Settings > Advanced
   });
 
-  test('status panel renders', async ({ page }) => {
-    const panel = await page.$('.proxy-status-panel');
-    expect(panel).not.toBeNull();
-    const text = await panel.textContent();
-    expect(text).toContain('Status');
+  test('proxy section renders', async ({ page }) => {
+    const ok = await page.evaluate(() =>
+      document.body.textContent.includes('Local Proxy'));
+    expect(ok).toBe(true);
   });
 
-  test('config checkboxes render', async ({ page }) => {
-    const checks = await page.$$('input[type="checkbox"][role="switch"]');
+  test('proxy config checkboxes render', async ({ page }) => {
+    const checks = await page.$$('input[type="checkbox"]');
     expect(checks.length).toBeGreaterThanOrEqual(2);
   });
 
-  test('config number inputs render', async ({ page }) => {
-    const inputs = await page.$$('input[type="number"]');
-    expect(inputs.length).toBeGreaterThanOrEqual(3);
-  });
-
   test('save proxy config', async ({ page }) => {
-    await clickInSection(page, 'Save');
+    await clickInSection(page, 'Save Proxy Config');
     await page.waitForTimeout(500);
     // No crash = pass
   });

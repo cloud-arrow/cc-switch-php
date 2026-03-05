@@ -119,6 +119,25 @@ class SkillService
     }
 
     /**
+     * Update skill enabled flags and sync accordingly.
+     *
+     * @param array<string, int> $updates e.g. ['enabled_claude' => 1, 'enabled_codex' => 0]
+     */
+    public function update(string $id, array $updates): void
+    {
+        $skill = $this->get($id);
+        if (!$skill) {
+            return;
+        }
+
+        // Update each enabled flag
+        foreach ($updates as $field => $value) {
+            $app = str_replace('enabled_', '', $field);
+            $this->updateEnabled($id, $app, (bool) $value);
+        }
+    }
+
+    /**
      * Sync all enabled skills to their enabled app directories.
      */
     public function syncToApps(): void

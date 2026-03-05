@@ -44,6 +44,20 @@ class McpController
         return ['status' => 200, 'body' => ['ok' => true]];
     }
 
+    public function update(array $vars, array $body): array
+    {
+        $id = $vars['id'];
+        // Allow updating per-app enabled flags
+        $data = ['id' => $id];
+        foreach (['enabled_claude', 'enabled_codex', 'enabled_gemini', 'enabled_opencode'] as $field) {
+            if (isset($body[$field])) {
+                $data[$field] = (int) $body[$field];
+            }
+        }
+        $server = $this->service->upsert($data);
+        return ['status' => 200, 'body' => get_object_vars($server)];
+    }
+
     public function sync(): array
     {
         $this->service->syncAll();

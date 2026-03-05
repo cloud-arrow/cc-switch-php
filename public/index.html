@@ -1,463 +1,983 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CC Switch</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        surface: { DEFAULT: '#1a1a2e', light: '#f8fafc' },
+                        card: { DEFAULT: '#16213e', light: '#ffffff' },
+                        border: { DEFAULT: '#2a2a4a', light: '#e2e8f0' },
+                    }
+                }
+            }
+        }
+    </script>
     <link rel="stylesheet" href="/assets/style.css">
+    <script src="/assets/icons.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
 </head>
-<body x-data="ccSwitch()" x-init="init()">
-    <div class="app-layout">
-        <!-- Sidebar -->
-        <nav class="sidebar">
-            <header>
-                <h2>CC Switch</h2>
-            </header>
-            <ul>
-                <li :class="{ active: currentTab === 'providers' }">
-                    <a href="#" @click.prevent="switchTab('providers')">Providers</a>
-                </li>
-                <li :class="{ active: currentTab === 'mcp' }">
-                    <a href="#" @click.prevent="switchTab('mcp')">MCP</a>
-                </li>
-                <li :class="{ active: currentTab === 'proxy' }">
-                    <a href="#" @click.prevent="switchTab('proxy')">Proxy</a>
-                </li>
-                <li :class="{ active: currentTab === 'skills' }">
-                    <a href="#" @click.prevent="switchTab('skills')">Skills</a>
-                </li>
-                <li :class="{ active: currentTab === 'prompts' }">
-                    <a href="#" @click.prevent="switchTab('prompts')">Prompts</a>
-                </li>
-                <li :class="{ active: currentTab === 'settings' }">
-                    <a href="#" @click.prevent="switchTab('settings')">Settings</a>
-                </li>
-                <li :class="{ active: currentTab === 'usage' }">
-                    <a href="#" @click.prevent="switchTab('usage')">Usage</a>
-                </li>
-            </ul>
-        </nav>
+<body class="bg-gray-950 text-gray-100 min-h-screen" x-data="ccSwitch()" x-init="init()" x-cloak>
 
-        <!-- Main Content -->
-        <main class="content">
-            <!-- App Type Selector (shown for provider/prompt/proxy tabs) -->
-            <div class="app-selector" x-show="['providers','prompts','proxy'].includes(currentTab)">
-                <template x-for="app in apps" :key="app">
-                    <button
-                        :class="{ 'outline': currentApp !== app, 'contrast': currentApp === app }"
-                        @click="switchApp(app)"
-                        x-text="app"
-                        class="app-btn"
-                    ></button>
+    <!-- ============================================================ -->
+    <!-- TOP NAVIGATION BAR (fixed 64px)                              -->
+    <!-- ============================================================ -->
+    <nav class="fixed top-0 left-0 right-0 h-16 bg-gray-900/95 backdrop-blur border-b border-gray-800 z-50 flex items-center px-4 gap-3">
+        <!-- Logo + Settings -->
+        <div class="flex items-center gap-2 mr-4">
+            <h1 class="text-lg font-bold text-white whitespace-nowrap">CC Switch</h1>
+            <button @click="currentView = 'settings'" class="p-1.5 rounded-lg hover:bg-gray-800 text-gray-400 hover:text-white transition" title="Settings">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
+            </button>
+        </div>
+
+        <!-- Proxy Toggle (shown for switch-mode apps on providers view) -->
+        <div x-show="currentView === 'providers' && ['claude','codex','gemini'].includes(currentApp)" class="flex items-center gap-2 px-3 py-1 rounded-lg bg-gray-800/50 mr-2">
+            <span class="text-xs text-gray-400">Proxy</span>
+            <label class="toggle-switch">
+                <input type="checkbox" :checked="proxyTakeover[currentApp]" @change="toggleProxyTakeover()">
+                <span class="toggle-slider"></span>
+            </label>
+        </div>
+
+        <!-- App Switcher Pills -->
+        <div class="flex items-center gap-1 bg-gray-800/50 rounded-xl p-1">
+            <template x-for="app in apps" :key="app">
+                <button
+                    @click="switchApp(app)"
+                    :class="currentApp === app
+                        ? 'bg-blue-600 text-white shadow-lg'
+                        : 'text-gray-400 hover:text-white hover:bg-gray-700/50'"
+                    class="px-3 py-1.5 rounded-lg text-sm font-medium transition-all capitalize flex items-center gap-1.5"
+                >
+                    <span class="provider-icon w-4 h-4" x-html="getAppIcon(app)"></span>
+                    <span class="hidden sm:inline" x-text="getAppDisplayName(app)"></span>
+                </button>
+            </template>
+        </div>
+
+        <!-- Spacer -->
+        <div class="flex-1"></div>
+
+        <!-- Right side tools -->
+        <div class="flex items-center gap-1">
+            <!-- MCP -->
+            <button @click="currentView = 'mcp'" :class="currentView === 'mcp' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'" class="p-2 rounded-lg hover:bg-gray-800 transition" title="MCP Servers">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
+            </button>
+            <!-- Prompts -->
+            <button @click="currentView = 'prompts'" :class="currentView === 'prompts' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'" class="p-2 rounded-lg hover:bg-gray-800 transition" title="Prompts">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            </button>
+            <!-- Skills -->
+            <button @click="currentView = 'skills'" :class="currentView === 'skills' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'" class="p-2 rounded-lg hover:bg-gray-800 transition" title="Skills">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>
+            </button>
+            <!-- Add Provider -->
+            <button @click="openAddProvider()" class="ml-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition flex items-center gap-1">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4"/></svg>
+                <span class="hidden sm:inline">Add</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- ============================================================ -->
+    <!-- MAIN CONTENT AREA                                            -->
+    <!-- ============================================================ -->
+    <main class="pt-16 min-h-screen">
+
+        <!-- ========== PROVIDERS VIEW ========== -->
+        <div x-show="currentView === 'providers'" class="max-w-5xl mx-auto p-4 sm:p-6">
+            <!-- Header -->
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h2 class="text-xl font-semibold">Providers</h2>
+                    <p class="text-sm text-gray-400" x-text="providers.length + ' configured for ' + getAppDisplayName(currentApp)"></p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span x-show="currentProvider" class="text-xs text-green-400 flex items-center gap-1">
+                        <span class="w-2 h-2 bg-green-400 rounded-full badge-active"></span>
+                        <span x-text="currentProvider?.name || ''"></span>
+                    </span>
+                </div>
+            </div>
+
+            <!-- Loading -->
+            <div x-show="loading" class="flex items-center justify-center py-12">
+                <svg class="animate-spin h-6 w-6 text-blue-500" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+            </div>
+
+            <!-- Provider Cards List -->
+            <div x-show="!loading" x-ref="providerList" class="space-y-2">
+                <template x-for="p in providers" :key="p.id">
+                    <div class="group bg-gray-900 border border-gray-800 rounded-xl p-3 sm:p-4 flex items-center gap-3 card-hover"
+                         :class="{ 'border-green-500/30 bg-green-500/5': p.is_current }">
+                        <!-- Drag Handle -->
+                        <div class="drag-handle text-gray-600 hover:text-gray-400 hidden sm:block">
+                            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>
+                        </div>
+                        <!-- Icon -->
+                        <div class="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
+                             :style="p.icon_color ? 'background-color:' + p.icon_color + '20' : 'background-color: #374151'">
+                            <span x-show="p.icon && getProviderIconSvg(p.icon)" class="provider-icon" x-html="getProviderIconSvg(p.icon)" :style="p.icon_color ? 'color:' + p.icon_color : ''"></span>
+                            <span x-show="!p.icon || !getProviderIconSvg(p.icon)" class="text-sm font-bold text-gray-400" x-text="getInitials(p.name)"></span>
+                        </div>
+                        <!-- Name + URL -->
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2">
+                                <span class="font-medium text-white truncate" x-text="p.name"></span>
+                                <span x-show="p.is_current" class="px-2 py-0.5 bg-green-500/20 text-green-400 rounded-full text-xs font-medium">Active</span>
+                                <span x-show="p.in_failover_queue" class="px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded-full text-xs font-medium">Failover</span>
+                            </div>
+                            <div class="text-xs text-gray-500 truncate" x-text="extractUrl(p)"></div>
+                        </div>
+                        <!-- Actions -->
+                        <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button x-show="!p.is_current" @click="switchProvider(p.id)" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium transition">Switch</button>
+                            <button @click="editProvider(p)" class="p-1.5 rounded-lg hover:bg-gray-700 text-gray-400 hover:text-white transition" title="Edit">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                            </button>
+                            <button @click="deleteProvider(p.id)" class="p-1.5 rounded-lg hover:bg-red-900/50 text-gray-400 hover:text-red-400 transition" title="Delete">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                            </button>
+                        </div>
+                    </div>
                 </template>
             </div>
 
-            <!-- Providers Tab -->
-            <section x-show="currentTab === 'providers'">
-                <div class="tab-header">
-                    <h3>Providers <small x-text="'(' + currentApp + ')'"></small></h3>
-                    <button @click="showAddProvider = true" class="btn-sm">+ Add</button>
+            <!-- Empty state -->
+            <div x-show="!loading && providers.length === 0" class="text-center py-16">
+                <svg class="w-16 h-16 mx-auto text-gray-700 mb-4" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24"><path d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/></svg>
+                <p class="text-gray-500 mb-4">No providers configured for <span x-text="getAppDisplayName(currentApp)"></span></p>
+                <button @click="openAddProvider()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition">Add First Provider</button>
+            </div>
+        </div>
+
+        <!-- ========== PROVIDER ADD/EDIT PANEL (Full-screen overlay) ========== -->
+        <div x-show="currentView === 'providerForm'" x-transition:enter="panel-enter" class="max-w-4xl mx-auto p-4 sm:p-6">
+            <!-- Back button -->
+            <button @click="closeProviderForm()" class="flex items-center gap-2 text-gray-400 hover:text-white mb-6 transition">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7"/></svg>
+                <span x-text="editingProvider ? 'Edit Provider' : 'Add New Provider'"></span>
+            </button>
+
+            <!-- Preset Selection -->
+            <div x-show="!editingProvider" class="mb-6">
+                <h3 class="text-sm font-medium text-gray-400 mb-3">Choose a Preset</h3>
+                <div class="flex flex-wrap gap-2">
+                    <button @click="selectPreset(null)" :class="selectedPreset === null ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'" class="px-3 py-1.5 rounded-lg text-sm transition preset-chip">Custom</button>
+                    <template x-for="preset in presets" :key="preset.name">
+                        <button @click="selectPreset(preset)" :class="selectedPreset?.name === preset.name ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'" class="px-3 py-1.5 rounded-lg text-sm transition preset-chip flex items-center gap-1.5">
+                            <span x-show="preset.icon" class="provider-icon w-4 h-4" x-html="getProviderIconSvg(preset.icon)" :style="preset.iconColor ? 'color:' + preset.iconColor : ''"></span>
+                            <span x-text="preset.name"></span>
+                        </button>
+                    </template>
                 </div>
+            </div>
 
-                <div x-show="loading" class="loading" aria-busy="true">Loading...</div>
-
-                <table x-show="!loading && providers.length > 0" role="grid">
-                    <thead>
-                        <tr>
-                            <th>Name</th>
-                            <th>Category</th>
-                            <th>Current</th>
-                            <th>Failover</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <template x-for="p in providers" :key="p.id">
-                            <tr :class="{ 'row-active': p.is_current }">
-                                <td x-text="p.name"></td>
-                                <td x-text="p.category || '-'"></td>
-                                <td>
-                                    <span x-show="p.is_current" class="badge badge-ok">Active</span>
-                                </td>
-                                <td>
-                                    <span x-show="p.in_failover_queue" class="badge badge-info">In Queue</span>
-                                </td>
-                                <td class="actions">
-                                    <button x-show="!p.is_current" @click="switchProvider(p.id)" class="btn-sm outline">Switch</button>
-                                    <button @click="editProvider(p)" class="btn-sm outline secondary">Edit</button>
-                                    <button @click="deleteProvider(p.id)" class="btn-sm outline secondary">Del</button>
-                                </td>
-                            </tr>
-                        </template>
-                    </tbody>
-                </table>
-
-                <p x-show="!loading && providers.length === 0">No providers configured for <span x-text="currentApp"></span>.</p>
-
-                <!-- Add/Edit Provider Dialog -->
-                <dialog :open="showAddProvider || editingProvider !== null">
-                    <article>
-                        <header>
-                            <button aria-label="Close" rel="prev" @click="closeProviderForm()"></button>
-                            <h4 x-text="editingProvider ? 'Edit Provider' : 'Add Provider'"></h4>
-                        </header>
-                        <label>Name
-                            <input type="text" x-model="providerForm.name" placeholder="Provider name">
-                        </label>
-                        <label>Category
-                            <input type="text" x-model="providerForm.category" placeholder="e.g. official, openrouter">
-                        </label>
-                        <label>Settings Config (JSON)
-                            <textarea x-model="providerForm.settings_config" rows="6" placeholder='{"env":{"ANTHROPIC_API_KEY":"..."}}'></textarea>
-                        </label>
-                        <label>Notes
-                            <textarea x-model="providerForm.notes" rows="2" placeholder="Optional notes"></textarea>
-                        </label>
-                        <label>Meta (JSON)
-                            <textarea x-model="providerForm.meta" rows="3" placeholder='{"costMultiplier":"1.0"}'></textarea>
-                        </label>
-                        <footer>
-                            <button class="secondary" @click="closeProviderForm()">Cancel</button>
-                            <button @click="saveProvider()" x-text="editingProvider ? 'Update' : 'Add'"></button>
-                        </footer>
-                    </article>
-                </dialog>
-            </section>
-
-            <!-- MCP Tab -->
-            <section x-show="currentTab === 'mcp'">
-                <div class="tab-header">
-                    <h3>MCP Servers</h3>
-                    <div>
-                        <button @click="syncMcp()" class="btn-sm outline secondary">Sync</button>
-                        <button @click="showAddMcp = true" class="btn-sm">+ Add</button>
-                    </div>
-                </div>
-
-                <div x-show="loading" class="loading" aria-busy="true">Loading...</div>
-
-                <table x-show="!loading && mcpServers.length > 0" role="grid">
-                    <thead>
-                        <tr>
-                            <th>Name</th>
-                            <th>Command / URL</th>
-                            <th>Type</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <template x-for="m in mcpServers" :key="m.id">
-                            <tr>
-                                <td x-text="m.name"></td>
-                                <td x-text="m.command || m.url || '-'" class="text-truncate"></td>
-                                <td x-text="m.type || 'stdio'"></td>
-                                <td>
-                                    <button @click="deleteMcp(m.id)" class="btn-sm outline secondary">Del</button>
-                                </td>
-                            </tr>
-                        </template>
-                    </tbody>
-                </table>
-
-                <p x-show="!loading && mcpServers.length === 0">No MCP servers configured.</p>
-
-                <dialog :open="showAddMcp">
-                    <article>
-                        <header>
-                            <button aria-label="Close" rel="prev" @click="showAddMcp = false"></button>
-                            <h4>Add MCP Server</h4>
-                        </header>
-                        <label>Name
-                            <input type="text" x-model="mcpForm.name" placeholder="Server name">
-                        </label>
-                        <label>Command
-                            <input type="text" x-model="mcpForm.command" placeholder="npx -y @modelcontextprotocol/server-xxx">
-                        </label>
-                        <label>Args (comma separated)
-                            <input type="text" x-model="mcpForm.args" placeholder="arg1,arg2">
-                        </label>
-                        <footer>
-                            <button class="secondary" @click="showAddMcp = false">Cancel</button>
-                            <button @click="addMcp()">Add</button>
-                        </footer>
-                    </article>
-                </dialog>
-            </section>
-
-            <!-- Proxy Tab -->
-            <section x-show="currentTab === 'proxy'">
-                <div class="tab-header">
-                    <h3>Proxy <small x-text="'(' + currentApp + ')'"></small></h3>
-                </div>
-
-                <div class="proxy-status-panel">
-                    <div class="grid">
-                        <div>
-                            <strong>Status:</strong>
-                            <span x-text="proxyStatus.running ? 'Running' : 'Stopped'" :class="proxyStatus.running ? 'badge badge-ok' : 'badge badge-err'"></span>
-                        </div>
-                        <div>
-                            <button x-show="!proxyStatus.running" @click="startProxy()" class="btn-sm">Start Proxy</button>
-                            <button x-show="proxyStatus.running" @click="stopProxy()" class="btn-sm outline secondary">Stop Proxy</button>
+            <!-- Basic Info Section -->
+            <div class="bg-gray-900 border border-gray-800 rounded-xl p-6 mb-4">
+                <h3 class="text-sm font-medium text-gray-400 mb-4">Basic Information</h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <!-- Icon Picker + Name -->
+                    <div class="sm:col-span-2 flex items-start gap-4">
+                        <button @click="showIconPicker = !showIconPicker" class="w-14 h-14 rounded-xl border-2 border-dashed border-gray-700 hover:border-blue-500 flex items-center justify-center transition flex-shrink-0" :style="providerForm.icon_color ? 'border-color:' + providerForm.icon_color + '60; background:' + providerForm.icon_color + '10' : ''">
+                            <span x-show="providerForm.icon && getProviderIconSvg(providerForm.icon)" class="provider-icon w-7 h-7" x-html="getProviderIconSvg(providerForm.icon)" :style="providerForm.icon_color ? 'color:' + providerForm.icon_color : ''"></span>
+                            <span x-show="!providerForm.icon || !getProviderIconSvg(providerForm.icon)" class="text-gray-500 text-xs">Icon</span>
+                        </button>
+                        <div class="flex-1">
+                            <label class="block text-xs text-gray-500 mb-1">Name</label>
+                            <input type="text" x-model="providerForm.name" placeholder="Provider name" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
                         </div>
                     </div>
-                </div>
-
-                <h4>Config</h4>
-                <div x-show="proxyConfig">
-                    <div class="grid">
-                        <label>Enabled
-                            <input type="checkbox" role="switch" :checked="proxyConfig.enabled" @change="proxyConfig.enabled = $event.target.checked ? 1 : 0">
-                        </label>
-                        <label>Auto Failover
-                            <input type="checkbox" role="switch" :checked="proxyConfig.auto_failover_enabled" @change="proxyConfig.auto_failover_enabled = $event.target.checked ? 1 : 0">
-                        </label>
-                        <label>Logging
-                            <input type="checkbox" role="switch" :checked="proxyConfig.enable_logging" @change="proxyConfig.enable_logging = $event.target.checked ? 1 : 0">
-                        </label>
-                    </div>
-                    <div class="grid">
-                        <label>Failure Threshold
-                            <input type="number" x-model.number="proxyConfig.circuit_failure_threshold" min="1">
-                        </label>
-                        <label>Success Threshold
-                            <input type="number" x-model.number="proxyConfig.circuit_success_threshold" min="1">
-                        </label>
-                        <label>Timeout (s)
-                            <input type="number" x-model.number="proxyConfig.circuit_timeout_seconds" min="1">
-                        </label>
-                    </div>
-                    <div class="grid">
-                        <label>First Byte Timeout (s)
-                            <input type="number" x-model.number="proxyConfig.streaming_first_byte_timeout" min="1">
-                        </label>
-                        <label>Idle Timeout (s)
-                            <input type="number" x-model.number="proxyConfig.streaming_idle_timeout" min="1">
-                        </label>
-                        <label>Non-stream Timeout (s)
-                            <input type="number" x-model.number="proxyConfig.non_streaming_timeout" min="1">
-                        </label>
-                    </div>
-                    <button @click="saveProxyConfig()">Save Config</button>
-                </div>
-
-                <h4>Health</h4>
-                <div x-show="loading" aria-busy="true">Loading...</div>
-                <table x-show="proxyHealth.length > 0" role="grid">
-                    <thead><tr><th>Provider</th><th>State</th><th>Failures</th><th>Total</th></tr></thead>
-                    <tbody>
-                        <template x-for="h in proxyHealth" :key="h.provider_id">
-                            <tr>
-                                <td x-text="h.provider_id"></td>
-                                <td><span :class="'badge badge-' + (h.state === 'closed' ? 'ok' : h.state === 'half_open' ? 'warn' : 'err')" x-text="h.state"></span></td>
-                                <td x-text="h.failures"></td>
-                                <td x-text="h.total_requests || 0"></td>
-                            </tr>
-                        </template>
-                    </tbody>
-                </table>
-                <p x-show="!loading && proxyHealth.length === 0">No health data available.</p>
-            </section>
-
-            <!-- Skills Tab -->
-            <section x-show="currentTab === 'skills'">
-                <div class="tab-header">
-                    <h3>Skills</h3>
                     <div>
-                        <button @click="syncSkills()" class="btn-sm outline secondary">Sync</button>
-                        <button @click="showInstallSkill = true" class="btn-sm">+ Install</button>
+                        <label class="block text-xs text-gray-500 mb-1">Notes</label>
+                        <input type="text" x-model="providerForm.notes" placeholder="Optional notes" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Website URL</label>
+                        <input type="text" x-model="providerForm.website_url" placeholder="https://..." class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Category</label>
+                        <select x-model="providerForm.category" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500">
+                            <option value="">None</option>
+                            <option value="official">Official</option>
+                            <option value="cn_official">CN Official</option>
+                            <option value="aggregator">Aggregator</option>
+                            <option value="third_party">Third Party</option>
+                            <option value="cloud_provider">Cloud Provider</option>
+                            <option value="custom">Custom</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Icon Picker Modal -->
+            <div x-show="showIconPicker" x-transition class="bg-gray-900 border border-gray-800 rounded-xl p-6 mb-4">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-sm font-medium text-gray-400">Choose Icon</h3>
+                    <button @click="showIconPicker = false" class="text-gray-500 hover:text-white"><svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"/></svg></button>
+                </div>
+                <input type="text" x-model="iconSearch" placeholder="Search icons..." class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 mb-4">
+                <div class="icon-grid max-h-64 overflow-y-auto">
+                    <template x-for="key in filteredIcons()" :key="key">
+                        <button @click="providerForm.icon = key; showIconPicker = false" class="icon-grid-item" :class="{ 'selected': providerForm.icon === key }" :title="key">
+                            <span class="provider-icon" x-html="getProviderIconSvg(key)"></span>
+                        </button>
+                    </template>
+                </div>
+                <div class="mt-3">
+                    <label class="block text-xs text-gray-500 mb-1">Icon Color</label>
+                    <input type="color" x-model="providerForm.icon_color" class="w-10 h-8 rounded cursor-pointer bg-transparent border border-gray-700">
+                </div>
+            </div>
+
+            <!-- Claude Fields -->
+            <div x-show="currentApp === 'claude'" class="bg-gray-900 border border-gray-800 rounded-xl p-6 mb-4">
+                <h3 class="text-sm font-medium text-gray-400 mb-4">Claude Configuration</h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div class="sm:col-span-2">
+                        <label class="block text-xs text-gray-500 mb-1">API Key / Auth Token</label>
+                        <input type="password" x-model="providerForm.claude.apiKey" placeholder="sk-ant-..." class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label class="block text-xs text-gray-500 mb-1">Base URL</label>
+                        <input type="text" x-model="providerForm.claude.baseUrl" placeholder="https://api.anthropic.com" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Model</label>
+                        <input type="text" x-model="providerForm.claude.model" placeholder="claude-sonnet-4-20250514" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Reasoning Model</label>
+                        <input type="text" x-model="providerForm.claude.reasoningModel" placeholder="" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Haiku Model</label>
+                        <input type="text" x-model="providerForm.claude.haikuModel" placeholder="" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Sonnet Model</label>
+                        <input type="text" x-model="providerForm.claude.sonnetModel" placeholder="" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Opus Model</label>
+                        <input type="text" x-model="providerForm.claude.opusModel" placeholder="" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Codex Fields -->
+            <div x-show="currentApp === 'codex'" class="bg-gray-900 border border-gray-800 rounded-xl p-6 mb-4">
+                <h3 class="text-sm font-medium text-gray-400 mb-4">Codex Configuration</h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">API Key</label>
+                        <input type="password" x-model="providerForm.codex.apiKey" placeholder="sk-..." class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Model</label>
+                        <input type="text" x-model="providerForm.codex.model" placeholder="gpt-5.2" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label class="block text-xs text-gray-500 mb-1">TOML Configuration</label>
+                        <textarea x-model="providerForm.codex.tomlConfig" rows="8" placeholder='model_provider = "openai"&#10;model = "gpt-5.2"&#10;...' class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 mono-textarea"></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Gemini Fields -->
+            <div x-show="currentApp === 'gemini'" class="bg-gray-900 border border-gray-800 rounded-xl p-6 mb-4">
+                <h3 class="text-sm font-medium text-gray-400 mb-4">Gemini Configuration</h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">API Key</label>
+                        <input type="password" x-model="providerForm.gemini.apiKey" placeholder="AIza..." class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Base URL</label>
+                        <input type="text" x-model="providerForm.gemini.baseUrl" placeholder="" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Model</label>
+                        <input type="text" x-model="providerForm.gemini.model" placeholder="gemini-3-pro" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
+                    </div>
+                </div>
+            </div>
+
+            <!-- OpenCode Fields -->
+            <div x-show="currentApp === 'opencode'" class="bg-gray-900 border border-gray-800 rounded-xl p-6 mb-4">
+                <h3 class="text-sm font-medium text-gray-400 mb-4">OpenCode Configuration</h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">NPM Package</label>
+                        <select x-model="providerForm.opencode.npmPackage" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500">
+                            <option value="@ai-sdk/openai">@ai-sdk/openai</option>
+                            <option value="@ai-sdk/anthropic">@ai-sdk/anthropic</option>
+                            <option value="@ai-sdk/google">@ai-sdk/google</option>
+                            <option value="@ai-sdk/mistral">@ai-sdk/mistral</option>
+                            <option value="@ai-sdk/cohere">@ai-sdk/cohere</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">API Key</label>
+                        <input type="password" x-model="providerForm.opencode.apiKey" placeholder="" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Base URL</label>
+                        <input type="text" x-model="providerForm.opencode.baseUrl" placeholder="" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Model</label>
+                        <input type="text" x-model="providerForm.opencode.model" placeholder="" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
+                    </div>
+                    <!-- Extra Options K-V Editor -->
+                    <div class="sm:col-span-2">
+                        <label class="block text-xs text-gray-500 mb-1">Extra Options</label>
+                        <template x-for="(opt, idx) in providerForm.opencode.extraOptions" :key="idx">
+                            <div class="kv-row mb-2">
+                                <input type="text" x-model="opt.key" placeholder="Key" class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
+                                <input type="text" x-model="opt.value" placeholder="Value" class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
+                                <button @click="providerForm.opencode.extraOptions.splice(idx, 1)" class="p-1 text-gray-500 hover:text-red-400"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"/></svg></button>
+                            </div>
+                        </template>
+                        <button @click="providerForm.opencode.extraOptions.push({key:'',value:''})" class="text-xs text-blue-400 hover:text-blue-300">+ Add Option</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- OpenClaw Fields -->
+            <div x-show="currentApp === 'openclaw'" class="bg-gray-900 border border-gray-800 rounded-xl p-6 mb-4">
+                <h3 class="text-sm font-medium text-gray-400 mb-4">OpenClaw Configuration</h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">API Protocol</label>
+                        <select x-model="providerForm.openclaw.api" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500">
+                            <option value="openai-completions">OpenAI Completions</option>
+                            <option value="openai-responses">OpenAI Responses</option>
+                            <option value="anthropic-messages">Anthropic Messages</option>
+                            <option value="google-generative-ai">Google Generative AI</option>
+                            <option value="bedrock-converse-stream">AWS Bedrock</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Base URL</label>
+                        <input type="text" x-model="providerForm.openclaw.baseUrl" placeholder="https://api.example.com/v1" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label class="block text-xs text-gray-500 mb-1">API Key</label>
+                        <input type="password" x-model="providerForm.openclaw.apiKey" placeholder="" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
+                    </div>
+                    <!-- Models List -->
+                    <div class="sm:col-span-2">
+                        <label class="block text-xs text-gray-500 mb-2">Models</label>
+                        <template x-for="(m, idx) in providerForm.openclaw.models" :key="idx">
+                            <div class="grid grid-cols-4 gap-2 mb-2 items-center">
+                                <input type="text" x-model="m.id" placeholder="Model ID" class="bg-gray-800 border border-gray-700 rounded-lg px-2 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
+                                <input type="text" x-model="m.name" placeholder="Display Name" class="bg-gray-800 border border-gray-700 rounded-lg px-2 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
+                                <input type="number" x-model.number="m.contextWindow" placeholder="Context" class="bg-gray-800 border border-gray-700 rounded-lg px-2 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
+                                <button @click="providerForm.openclaw.models.splice(idx, 1)" class="p-1 text-gray-500 hover:text-red-400 justify-self-start"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"/></svg></button>
+                            </div>
+                        </template>
+                        <button @click="providerForm.openclaw.models.push({id:'',name:'',contextWindow:0})" class="text-xs text-blue-400 hover:text-blue-300">+ Add Model</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Raw JSON Collapsible -->
+            <details class="bg-gray-900 border border-gray-800 rounded-xl mb-4">
+                <summary class="px-6 py-3 cursor-pointer text-sm text-gray-400 hover:text-white">Raw JSON Configuration</summary>
+                <div class="px-6 pb-4">
+                    <textarea x-model="providerForm.rawJson" rows="8" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 mono-textarea" placeholder="{}"></textarea>
+                </div>
+            </details>
+
+            <!-- Save/Cancel -->
+            <div class="flex justify-end gap-3">
+                <button @click="closeProviderForm()" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-sm transition">Cancel</button>
+                <button @click="saveProvider()" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition" x-text="editingProvider ? 'Update' : 'Save'"></button>
+            </div>
+        </div>
+
+        <!-- ========== MCP VIEW ========== -->
+        <div x-show="currentView === 'mcp'" class="max-w-5xl mx-auto p-4 sm:p-6">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h2 class="text-xl font-semibold">MCP Servers</h2>
+                    <p class="text-sm text-gray-400">
+                        <span x-text="mcpServers.length"></span> configured
+                        <template x-for="app in apps.slice(0,4)" :key="app">
+                            <span class="ml-2" x-text="'· ' + getAppDisplayName(app) + ': ' + mcpServers.filter(m => m['enabled_' + app]).length"></span>
+                        </template>
+                    </p>
+                </div>
+                <div class="flex gap-2">
+                    <button @click="syncMcp()" class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-sm transition">Sync</button>
+                    <button @click="openAddMcp()" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition">+ Add</button>
+                </div>
+            </div>
+
+            <!-- MCP Card List -->
+            <div class="space-y-2">
+                <template x-for="m in mcpServers" :key="m.id">
+                    <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 flex items-center gap-4 card-hover">
+                        <div class="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center flex-shrink-0">
+                            <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="font-medium text-white" x-text="m.name || m.id"></div>
+                            <div class="text-xs text-gray-500 truncate" x-text="getMcpCommand(m)"></div>
+                        </div>
+                        <!-- Per-app toggles -->
+                        <div class="flex items-center gap-3">
+                            <template x-for="app in ['claude','codex','gemini','opencode']" :key="app">
+                                <div class="flex flex-col items-center gap-0.5">
+                                    <span class="text-[10px] text-gray-500 capitalize" x-text="app.slice(0,3)"></span>
+                                    <label class="toggle-switch" style="width:28px;height:16px">
+                                        <input type="checkbox" :checked="m['enabled_' + app]" @change="toggleMcpApp(m.id, app, $event.target.checked)">
+                                        <span class="toggle-slider" style="--tw-translate-x:12px"><span style="height:12px;width:12px;left:2px;bottom:2px"></span></span>
+                                    </label>
+                                </div>
+                            </template>
+                        </div>
+                        <!-- Actions -->
+                        <div class="flex items-center gap-1">
+                            <button @click="editMcpServer(m)" class="p-1.5 rounded-lg hover:bg-gray-700 text-gray-400 hover:text-white transition" title="Edit">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                            </button>
+                            <button @click="deleteMcp(m.id)" class="p-1.5 rounded-lg hover:bg-red-900/50 text-gray-400 hover:text-red-400 transition" title="Delete">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+
+            <div x-show="!loading && mcpServers.length === 0" class="text-center py-16">
+                <p class="text-gray-500 mb-4">No MCP servers configured</p>
+                <button @click="openAddMcp()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition">Add MCP Server</button>
+            </div>
+        </div>
+
+        <!-- ========== MCP ADD/EDIT PANEL ========== -->
+        <div x-show="currentView === 'mcpForm'" x-transition:enter="panel-enter" class="max-w-4xl mx-auto p-4 sm:p-6">
+            <button @click="currentView = 'mcp'" class="flex items-center gap-2 text-gray-400 hover:text-white mb-6 transition">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7"/></svg>
+                <span x-text="editingMcp ? 'Edit MCP Server' : 'Add MCP Server'"></span>
+            </button>
+
+            <!-- Presets -->
+            <div x-show="!editingMcp" class="mb-6">
+                <h3 class="text-sm font-medium text-gray-400 mb-3">Quick Presets</h3>
+                <div class="flex flex-wrap gap-2">
+                    <template x-for="preset in MCP_PRESETS" :key="preset.id">
+                        <button @click="selectMcpPreset(preset)" class="px-3 py-1.5 bg-gray-800 text-gray-300 hover:bg-gray-700 rounded-lg text-sm transition">
+                            <span x-text="preset.name"></span>
+                        </button>
+                    </template>
+                </div>
+            </div>
+
+            <div class="bg-gray-900 border border-gray-800 rounded-xl p-6 mb-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">ID</label>
+                        <input type="text" x-model="mcpForm.id" placeholder="server-id" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500" :disabled="editingMcp">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Name</label>
+                        <input type="text" x-model="mcpForm.name" placeholder="Display name" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Command</label>
+                        <input type="text" x-model="mcpForm.command" placeholder="npx" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Args (comma separated)</label>
+                        <input type="text" x-model="mcpForm.args" placeholder="-y,@package/name" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
+                    </div>
+                    <!-- Per-app checkboxes -->
+                    <div class="sm:col-span-2">
+                        <label class="block text-xs text-gray-500 mb-2">Enable for Apps</label>
+                        <div class="flex flex-wrap gap-4">
+                            <template x-for="app in ['claude','codex','gemini','opencode']" :key="app">
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" x-model="mcpForm['enabled_' + app]" class="rounded bg-gray-800 border-gray-600 text-blue-600 focus:ring-blue-500">
+                                    <span class="text-sm capitalize" x-text="app"></span>
+                                </label>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Collapsible extra fields -->
+            <details class="bg-gray-900 border border-gray-800 rounded-xl mb-4">
+                <summary class="px-6 py-3 cursor-pointer text-sm text-gray-400 hover:text-white">Additional Info</summary>
+                <div class="px-6 pb-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Description</label>
+                        <input type="text" x-model="mcpForm.description" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Tags</label>
+                        <input type="text" x-model="mcpForm.tags" placeholder="stdio,http" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Homepage</label>
+                        <input type="text" x-model="mcpForm.homepage" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Docs</label>
+                        <input type="text" x-model="mcpForm.docs" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
+                    </div>
+                </div>
+            </details>
+
+            <div class="flex justify-end gap-3">
+                <button @click="currentView = 'mcp'" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-sm transition">Cancel</button>
+                <button @click="saveMcp()" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition" x-text="editingMcp ? 'Update' : 'Add'"></button>
+            </div>
+        </div>
+
+        <!-- ========== SKILLS VIEW ========== -->
+        <div x-show="currentView === 'skills'" class="max-w-5xl mx-auto p-4 sm:p-6">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h2 class="text-xl font-semibold">Skills</h2>
+                    <p class="text-sm text-gray-400" x-text="skills.length + ' installed'"></p>
+                </div>
+                <div class="flex gap-2">
+                    <button @click="syncSkills()" class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-sm transition">Sync</button>
+                    <button @click="currentView = 'skillsDiscovery'; loadSkillRepos(); loadDiscoveredSkills()" class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-sm transition">Discover</button>
+                    <button @click="showInstallSkill = true" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition">+ Install</button>
+                </div>
+            </div>
+
+            <!-- Skills Card List -->
+            <div class="space-y-2">
+                <template x-for="s in skills" :key="s.id">
+                    <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 flex items-center gap-4 card-hover">
+                        <div class="w-10 h-10 rounded-lg bg-yellow-500/10 flex items-center justify-center flex-shrink-0">
+                            <svg class="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="font-medium text-white" x-text="s.name"></div>
+                            <div class="text-xs text-gray-500 truncate" x-text="s.description || s.directory || '-'"></div>
+                        </div>
+                        <!-- Per-app toggles -->
+                        <div class="flex items-center gap-3">
+                            <template x-for="app in ['claude','codex','gemini','opencode']" :key="app">
+                                <div class="flex flex-col items-center gap-0.5">
+                                    <span class="text-[10px] text-gray-500 capitalize" x-text="app.slice(0,3)"></span>
+                                    <label class="toggle-switch" style="width:28px;height:16px">
+                                        <input type="checkbox" :checked="s['enabled_' + app]" @change="toggleSkillApp(s.id, app, $event.target.checked)">
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                </div>
+                            </template>
+                        </div>
+                        <button @click="deleteSkill(s.id)" class="p-1.5 rounded-lg hover:bg-red-900/50 text-gray-400 hover:text-red-400 transition" title="Delete">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                        </button>
+                    </div>
+                </template>
+            </div>
+
+            <div x-show="!loading && skills.length === 0" class="text-center py-16">
+                <p class="text-gray-500 mb-4">No skills installed</p>
+            </div>
+
+            <!-- Install Skill Dialog -->
+            <div x-show="showInstallSkill" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" @click.self="showInstallSkill = false">
+                <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 w-full max-w-md">
+                    <h3 class="text-lg font-semibold mb-4">Install Skill</h3>
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-1">Repository Owner</label>
+                            <input type="text" x-model="skillForm.repo_owner" placeholder="anthropics" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-1">Repository Name</label>
+                            <input type="text" x-model="skillForm.repo_name" placeholder="claude-code-skills" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-1">Directory</label>
+                            <input type="text" x-model="skillForm.directory" placeholder="skills/my-skill" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
+                        </div>
+                    </div>
+                    <div class="flex justify-end gap-3 mt-6">
+                        <button @click="showInstallSkill = false" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-sm transition">Cancel</button>
+                        <button @click="installSkill()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition">Install</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========== SKILLS DISCOVERY VIEW ========== -->
+        <div x-show="currentView === 'skillsDiscovery'" class="max-w-5xl mx-auto p-4 sm:p-6">
+            <button @click="currentView = 'skills'" class="flex items-center gap-2 text-gray-400 hover:text-white mb-6 transition">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7"/></svg>
+                Discover Skills
+            </button>
+
+            <!-- Repo management -->
+            <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 mb-6">
+                <h3 class="text-sm font-medium text-gray-400 mb-3">Skill Repositories</h3>
+                <div class="flex gap-2 mb-3">
+                    <input type="text" x-model="newRepoOwner" placeholder="owner" class="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
+                    <input type="text" x-model="newRepoName" placeholder="repo" class="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
+                    <button @click="addSkillRepo()" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm transition">Add</button>
+                </div>
+                <div class="space-y-1">
+                    <template x-for="repo in skillRepos" :key="repo.owner + '/' + repo.name">
+                        <div class="flex items-center justify-between px-3 py-2 bg-gray-800/50 rounded-lg">
+                            <span class="text-sm" x-text="repo.owner + '/' + repo.name"></span>
+                            <div class="flex gap-2">
+                                <button @click="discoverFromRepo(repo.owner, repo.name)" class="text-xs text-blue-400 hover:text-blue-300">Discover</button>
+                                <button @click="removeSkillRepo(repo.owner, repo.name)" class="text-xs text-red-400 hover:text-red-300">Remove</button>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Discovered skills grid -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                <template x-for="ds in discoveredSkills" :key="ds.directory">
+                    <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+                        <div class="font-medium text-white mb-1" x-text="ds.name || ds.directory"></div>
+                        <div class="text-xs text-gray-500 mb-3 line-clamp-2" x-text="ds.description || ''"></div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs text-gray-600" x-text="ds.repo_owner + '/' + ds.repo_name"></span>
+                            <button @click="installDiscoveredSkill(ds)" class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs transition" :disabled="isSkillInstalled(ds)" :class="isSkillInstalled(ds) ? 'opacity-50 cursor-not-allowed' : ''" x-text="isSkillInstalled(ds) ? 'Installed' : 'Install'"></button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+
+        <!-- ========== PROMPTS VIEW ========== -->
+        <div x-show="currentView === 'prompts'" class="max-w-5xl mx-auto p-4 sm:p-6">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h2 class="text-xl font-semibold">Prompts</h2>
+                    <p class="text-sm text-gray-400">
+                        <span x-text="prompts.length + ' prompts for ' + getAppDisplayName(currentApp)"></span>
+                        <span x-show="activePrompt" class="text-green-400"> · Active: <span x-text="activePrompt?.title || activePrompt?.name || ''"></span></span>
+                    </p>
+                </div>
+                <button @click="openAddPrompt()" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition">+ Add</button>
+            </div>
+
+            <div class="space-y-2">
+                <template x-for="pr in prompts" :key="pr.id">
+                    <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 flex items-center gap-4 card-hover" :class="{ 'border-green-500/30': pr.is_active }">
+                        <!-- Active toggle -->
+                        <label class="toggle-switch">
+                            <input type="checkbox" :checked="pr.is_active" @change="togglePrompt(pr)">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <div class="flex-1 min-w-0">
+                            <div class="font-medium text-white" x-text="pr.title || pr.name || '-'"></div>
+                            <div class="text-xs text-gray-500 truncate" x-text="(pr.content || '').substring(0, 120)"></div>
+                        </div>
+                        <div class="flex items-center gap-1">
+                            <button @click="editPrompt(pr)" class="p-1.5 rounded-lg hover:bg-gray-700 text-gray-400 hover:text-white transition" title="Edit">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                            </button>
+                            <button @click="deletePrompt(pr.id)" class="p-1.5 rounded-lg hover:bg-red-900/50 text-gray-400 hover:text-red-400 transition" title="Delete">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+
+            <div x-show="!loading && prompts.length === 0" class="text-center py-16">
+                <p class="text-gray-500 mb-4">No prompts for <span x-text="getAppDisplayName(currentApp)"></span></p>
+            </div>
+        </div>
+
+        <!-- ========== PROMPT ADD/EDIT PANEL ========== -->
+        <div x-show="currentView === 'promptForm'" x-transition:enter="panel-enter" class="max-w-4xl mx-auto p-4 sm:p-6">
+            <button @click="closePromptForm()" class="flex items-center gap-2 text-gray-400 hover:text-white mb-6 transition">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7"/></svg>
+                <span x-text="editingPrompt ? 'Edit Prompt' : 'Add Prompt'"></span>
+            </button>
+
+            <div class="bg-gray-900 border border-gray-800 rounded-xl p-6 mb-4">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Title</label>
+                        <input type="text" x-model="promptForm.title" placeholder="Prompt title" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Description</label>
+                        <input type="text" x-model="promptForm.description" placeholder="Brief description" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Content</label>
+                        <textarea x-model="promptForm.content" rows="16" placeholder="Prompt content..." class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 mono-textarea"></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-3">
+                <button @click="closePromptForm()" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-sm transition">Cancel</button>
+                <button @click="savePrompt()" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition" x-text="editingPrompt ? 'Update' : 'Add'"></button>
+            </div>
+        </div>
+
+        <!-- ========== SETTINGS VIEW ========== -->
+        <div x-show="currentView === 'settings'" class="max-w-4xl mx-auto p-4 sm:p-6">
+            <button @click="currentView = 'providers'" class="flex items-center gap-2 text-gray-400 hover:text-white mb-6 transition">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7"/></svg>
+                Settings
+            </button>
+
+            <!-- Settings tabs -->
+            <div class="flex gap-1 mb-6 bg-gray-900 rounded-xl p-1 w-fit">
+                <button @click="settingsTab = 'general'" :class="settingsTab === 'general' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'" class="px-4 py-1.5 rounded-lg text-sm transition">General</button>
+                <button @click="settingsTab = 'advanced'" :class="settingsTab === 'advanced' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'" class="px-4 py-1.5 rounded-lg text-sm transition">Advanced</button>
+                <button @click="settingsTab = 'usage'; loadUsageAll()" :class="settingsTab === 'usage' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'" class="px-4 py-1.5 rounded-lg text-sm transition">Usage</button>
+            </div>
+
+            <!-- General Tab -->
+            <div x-show="settingsTab === 'general'" class="space-y-4">
+                <div class="bg-gray-900 border border-gray-800 rounded-xl p-6">
+                    <h3 class="text-sm font-medium text-gray-400 mb-4">Appearance</h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-1">Theme</label>
+                            <div class="flex gap-2">
+                                <button @click="setTheme('light')" :class="theme === 'light' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-300'" class="px-3 py-1.5 rounded-lg text-sm transition">Light</button>
+                                <button @click="setTheme('dark')" :class="theme === 'dark' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-300'" class="px-3 py-1.5 rounded-lg text-sm transition">Dark</button>
+                                <button @click="setTheme('auto')" :class="theme === 'auto' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-300'" class="px-3 py-1.5 rounded-lg text-sm transition">Auto</button>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-1">Language</label>
+                            <select x-model="settingsData.language" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500">
+                                <option value="en">English</option>
+                                <option value="zh">Chinese</option>
+                                <option value="ja">Japanese</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Advanced Tab -->
+            <div x-show="settingsTab === 'advanced'" class="space-y-4">
+                <!-- Proxy Config -->
+                <div class="bg-gray-900 border border-gray-800 rounded-xl p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-sm font-medium text-gray-400">Local Proxy</h3>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs" :class="proxyStatus.running ? 'text-green-400' : 'text-gray-500'" x-text="proxyStatus.running ? 'Running' : 'Stopped'"></span>
+                            <button x-show="!proxyStatus.running" @click="startProxy()" class="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs transition">Start</button>
+                            <button x-show="proxyStatus.running" @click="stopProxy()" class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs transition">Stop</button>
+                        </div>
+                    </div>
+
+                    <div x-show="proxyConfig" class="space-y-4">
+                        <div class="grid grid-cols-3 gap-4">
+                            <label class="flex items-center gap-2">
+                                <input type="checkbox" :checked="proxyConfig?.enabled" @change="proxyConfig.enabled = $event.target.checked ? 1 : 0" class="rounded bg-gray-800 border-gray-600">
+                                <span class="text-sm">Enabled</span>
+                            </label>
+                            <label class="flex items-center gap-2">
+                                <input type="checkbox" :checked="proxyConfig?.auto_failover_enabled" @change="proxyConfig.auto_failover_enabled = $event.target.checked ? 1 : 0" class="rounded bg-gray-800 border-gray-600">
+                                <span class="text-sm">Auto Failover</span>
+                            </label>
+                            <label class="flex items-center gap-2">
+                                <input type="checkbox" :checked="proxyConfig?.enable_logging" @change="proxyConfig.enable_logging = $event.target.checked ? 1 : 0" class="rounded bg-gray-800 border-gray-600">
+                                <span class="text-sm">Logging</span>
+                            </label>
+                        </div>
+
+                        <!-- Circuit Breaker (collapsible) -->
+                        <details>
+                            <summary class="cursor-pointer text-sm text-gray-400 hover:text-white">Circuit Breaker Settings</summary>
+                            <div class="grid grid-cols-3 gap-4 mt-3">
+                                <div>
+                                    <label class="block text-xs text-gray-500 mb-1">Failure Threshold</label>
+                                    <input type="number" x-model.number="proxyConfig.circuit_failure_threshold" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-blue-500">
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-gray-500 mb-1">Success Threshold</label>
+                                    <input type="number" x-model.number="proxyConfig.circuit_success_threshold" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-blue-500">
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-gray-500 mb-1">Timeout (s)</label>
+                                    <input type="number" x-model.number="proxyConfig.circuit_timeout_seconds" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-blue-500">
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-gray-500 mb-1">First Byte Timeout</label>
+                                    <input type="number" x-model.number="proxyConfig.streaming_first_byte_timeout" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-blue-500">
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-gray-500 mb-1">Idle Timeout</label>
+                                    <input type="number" x-model.number="proxyConfig.streaming_idle_timeout" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-blue-500">
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-gray-500 mb-1">Non-stream Timeout</label>
+                                    <input type="number" x-model.number="proxyConfig.non_streaming_timeout" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-blue-500">
+                                </div>
+                            </div>
+                        </details>
+                        <button @click="saveProxyConfig()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm transition">Save Proxy Config</button>
                     </div>
                 </div>
 
-                <div x-show="loading" class="loading" aria-busy="true">Loading...</div>
-
-                <table x-show="!loading && skills.length > 0" role="grid">
-                    <thead><tr><th>Name</th><th>Description</th><th>Actions</th></tr></thead>
-                    <tbody>
-                        <template x-for="s in skills" :key="s.id">
-                            <tr>
-                                <td x-text="s.name"></td>
-                                <td x-text="s.description || '-'" class="text-truncate"></td>
-                                <td><button @click="deleteSkill(s.id)" class="btn-sm outline secondary">Del</button></td>
-                            </tr>
-                        </template>
-                    </tbody>
-                </table>
-
-                <p x-show="!loading && skills.length === 0">No skills installed.</p>
-
-                <dialog :open="showInstallSkill">
-                    <article>
-                        <header>
-                            <button aria-label="Close" rel="prev" @click="showInstallSkill = false"></button>
-                            <h4>Install Skill</h4>
-                        </header>
-                        <label>Name
-                            <input type="text" x-model="skillForm.name" placeholder="Skill name">
-                        </label>
-                        <label>Source URL or Path
-                            <input type="text" x-model="skillForm.source" placeholder="https://... or /path/to/skill">
-                        </label>
-                        <footer>
-                            <button class="secondary" @click="showInstallSkill = false">Cancel</button>
-                            <button @click="installSkill()">Install</button>
-                        </footer>
-                    </article>
-                </dialog>
-            </section>
-
-            <!-- Prompts Tab -->
-            <section x-show="currentTab === 'prompts'">
-                <div class="tab-header">
-                    <h3>Prompts <small x-text="'(' + currentApp + ')'"></small></h3>
-                    <button @click="showAddPrompt = true" class="btn-sm">+ Add</button>
+                <!-- Global Proxy -->
+                <div class="bg-gray-900 border border-gray-800 rounded-xl p-6">
+                    <h3 class="text-sm font-medium text-gray-400 mb-4">Global Proxy</h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div class="sm:col-span-2">
+                            <label class="block text-xs text-gray-500 mb-1">Proxy URL</label>
+                            <input type="text" x-model="settingsData.proxyUrl" placeholder="http://127.0.0.1:7890" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
+                        </div>
+                    </div>
                 </div>
 
-                <div x-show="loading" class="loading" aria-busy="true">Loading...</div>
-
-                <table x-show="!loading && prompts.length > 0" role="grid">
-                    <thead><tr><th>Title</th><th>Content</th><th>Actions</th></tr></thead>
-                    <tbody>
-                        <template x-for="pr in prompts" :key="pr.id">
-                            <tr>
-                                <td x-text="pr.title || pr.name || '-'"></td>
-                                <td x-text="(pr.content || '').substring(0, 80)" class="text-truncate"></td>
-                                <td class="actions">
-                                    <button @click="editPrompt(pr)" class="btn-sm outline secondary">Edit</button>
-                                    <button @click="deletePrompt(pr.id)" class="btn-sm outline secondary">Del</button>
-                                </td>
-                            </tr>
+                <!-- Backup -->
+                <div class="bg-gray-900 border border-gray-800 rounded-xl p-6">
+                    <h3 class="text-sm font-medium text-gray-400 mb-4">Backup</h3>
+                    <div class="flex gap-2">
+                        <button @click="createBackup()" class="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm transition">Create Backup</button>
+                        <button @click="loadBackups()" class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-sm transition">List Backups</button>
+                        <button @click="cleanupBackups()" class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-sm transition">Cleanup</button>
+                    </div>
+                    <div x-show="backups.length > 0" class="mt-3 space-y-1">
+                        <template x-for="b in backups" :key="b.filename">
+                            <div class="flex items-center justify-between px-3 py-2 bg-gray-800/50 rounded-lg">
+                                <span class="text-sm" x-text="b.filename"></span>
+                                <button @click="restoreBackup(b.filename)" class="text-xs text-blue-400 hover:text-blue-300">Restore</button>
+                            </div>
                         </template>
-                    </tbody>
-                </table>
-
-                <p x-show="!loading && prompts.length === 0">No prompts for <span x-text="currentApp"></span>.</p>
-
-                <dialog :open="showAddPrompt || editingPrompt !== null">
-                    <article>
-                        <header>
-                            <button aria-label="Close" rel="prev" @click="closePromptForm()"></button>
-                            <h4 x-text="editingPrompt ? 'Edit Prompt' : 'Add Prompt'"></h4>
-                        </header>
-                        <label>Title
-                            <input type="text" x-model="promptForm.title" placeholder="Prompt title">
-                        </label>
-                        <label>Content
-                            <textarea x-model="promptForm.content" rows="8" placeholder="Prompt content..."></textarea>
-                        </label>
-                        <footer>
-                            <button class="secondary" @click="closePromptForm()">Cancel</button>
-                            <button @click="savePrompt()" x-text="editingPrompt ? 'Update' : 'Add'"></button>
-                        </footer>
-                    </article>
-                </dialog>
-            </section>
-
-            <!-- Settings Tab -->
-            <section x-show="currentTab === 'settings'">
-                <h3>Settings</h3>
-                <div x-show="loading" aria-busy="true">Loading...</div>
-
-                <div x-show="!loading && settings">
-                    <label>Theme
-                        <select x-model="settings.theme">
-                            <option value="dark">Dark</option>
-                            <option value="light">Light</option>
-                            <option value="auto">Auto</option>
-                        </select>
-                    </label>
-                    <label>Language
-                        <select x-model="settings.language">
-                            <option value="en">English</option>
-                            <option value="zh">Chinese</option>
-                            <option value="ja">Japanese</option>
-                        </select>
-                    </label>
-                    <label>Auto Start Proxy
-                        <input type="checkbox" role="switch" :checked="settings.auto_start_proxy" @change="settings.auto_start_proxy = $event.target.checked">
-                    </label>
-                    <button @click="saveSettings()">Save Settings</button>
+                    </div>
                 </div>
-            </section>
+
+                <!-- WebDAV Sync -->
+                <div class="bg-gray-900 border border-gray-800 rounded-xl p-6">
+                    <h3 class="text-sm font-medium text-gray-400 mb-4">WebDAV Sync</h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div class="sm:col-span-2">
+                            <label class="block text-xs text-gray-500 mb-1">WebDAV URL</label>
+                            <input type="text" x-model="settingsData.syncUrl" placeholder="https://dav.example.com/cc-switch/" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-1">Username</label>
+                            <input type="text" x-model="settingsData.syncUser" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-1">Password</label>
+                            <input type="password" x-model="settingsData.syncPass" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
+                        </div>
+                    </div>
+                    <div class="flex gap-2 mt-4">
+                        <button @click="syncPush()" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm transition">Push</button>
+                        <button @click="syncPull()" class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-sm transition">Pull</button>
+                        <button @click="syncTest()" class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-sm transition">Test</button>
+                    </div>
+                </div>
+
+                <button @click="saveSettings()" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition">Save Settings</button>
+            </div>
 
             <!-- Usage Tab -->
-            <section x-show="currentTab === 'usage'">
-                <h3>Usage</h3>
-
-                <div class="grid">
-                    <label>App
-                        <select x-model="usageFilter.app" @change="loadUsageStats()">
-                            <template x-for="app in apps" :key="app">
-                                <option :value="app" x-text="app"></option>
-                            </template>
-                        </select>
-                    </label>
-                    <label>Period
-                        <select x-model="usageFilter.period" @change="loadUsageStats()">
-                            <option value="today">Today</option>
-                            <option value="week">This Week</option>
-                            <option value="month">This Month</option>
-                            <option value="all">All Time</option>
-                        </select>
-                    </label>
+            <div x-show="settingsTab === 'usage'" class="space-y-4">
+                <div class="flex gap-3 mb-4">
+                    <select x-model="usageFilter.app" @change="loadUsageAll()" class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-blue-500">
+                        <template x-for="app in apps" :key="app"><option :value="app" x-text="getAppDisplayName(app)"></option></template>
+                    </select>
+                    <select x-model="usageFilter.period" @change="loadUsageStats()" class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-blue-500">
+                        <option value="today">Today</option>
+                        <option value="week">This Week</option>
+                        <option value="month">This Month</option>
+                        <option value="all">All Time</option>
+                    </select>
                 </div>
 
-                <div x-show="usageStats" class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-value" x-text="usageStats.total_requests || 0"></div>
-                        <div class="stat-label">Total Requests</div>
+                <!-- Stats cards -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 text-center">
+                        <div class="text-2xl font-bold text-white" x-text="usageStats.total_requests || 0"></div>
+                        <div class="text-xs text-gray-500 mt-1">Requests</div>
                     </div>
-                    <div class="stat-card">
-                        <div class="stat-value" x-text="formatTokens(usageStats.total_input_tokens || 0)"></div>
-                        <div class="stat-label">Input Tokens</div>
+                    <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 text-center">
+                        <div class="text-2xl font-bold text-white" x-text="formatTokens(usageStats.total_input_tokens || 0)"></div>
+                        <div class="text-xs text-gray-500 mt-1">Input Tokens</div>
                     </div>
-                    <div class="stat-card">
-                        <div class="stat-value" x-text="formatTokens(usageStats.total_output_tokens || 0)"></div>
-                        <div class="stat-label">Output Tokens</div>
+                    <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 text-center">
+                        <div class="text-2xl font-bold text-white" x-text="formatTokens(usageStats.total_output_tokens || 0)"></div>
+                        <div class="text-xs text-gray-500 mt-1">Output Tokens</div>
                     </div>
-                    <div class="stat-card">
-                        <div class="stat-value" x-text="'$' + (usageStats.total_cost || 0).toFixed(4)"></div>
-                        <div class="stat-label">Total Cost</div>
+                    <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 text-center">
+                        <div class="text-2xl font-bold text-white" x-text="'$' + (usageStats.total_cost || 0).toFixed(4)"></div>
+                        <div class="text-xs text-gray-500 mt-1">Total Cost</div>
                     </div>
                 </div>
 
-                <h4>Recent Logs</h4>
-                <table x-show="usageLogs.length > 0" role="grid">
-                    <thead>
-                        <tr>
-                            <th>Time</th>
-                            <th>Model</th>
-                            <th>Input</th>
-                            <th>Output</th>
-                            <th>Cost</th>
-                            <th>Latency</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <template x-for="log in usageLogs" :key="log.request_id">
-                            <tr>
-                                <td x-text="formatTime(log.created_at)"></td>
-                                <td x-text="log.model"></td>
-                                <td x-text="log.input_tokens"></td>
-                                <td x-text="log.output_tokens"></td>
-                                <td x-text="'$' + parseFloat(log.total_cost_usd || 0).toFixed(6)"></td>
-                                <td x-text="log.latency_ms + 'ms'"></td>
-                                <td>
-                                    <span :class="'badge ' + (log.status_code < 400 ? 'badge-ok' : 'badge-err')" x-text="log.status_code"></span>
-                                </td>
-                            </tr>
-                        </template>
-                    </tbody>
-                </table>
-                <p x-show="usageLogs.length === 0">No usage logs yet.</p>
-            </section>
+                <!-- Logs table -->
+                <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+                    <h3 class="text-sm font-medium text-gray-400 px-4 py-3">Recent Logs</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead class="text-xs text-gray-500 border-b border-gray-800">
+                                <tr><th class="px-4 py-2 text-left">Time</th><th class="px-4 py-2 text-left">Model</th><th class="px-4 py-2 text-right">In</th><th class="px-4 py-2 text-right">Out</th><th class="px-4 py-2 text-right">Cost</th><th class="px-4 py-2 text-right">Latency</th><th class="px-4 py-2 text-center">Status</th></tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="log in usageLogs" :key="log.request_id">
+                                    <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+                                        <td class="px-4 py-2 text-gray-400" x-text="formatTime(log.created_at)"></td>
+                                        <td class="px-4 py-2 text-white" x-text="log.model"></td>
+                                        <td class="px-4 py-2 text-right text-gray-400" x-text="log.input_tokens"></td>
+                                        <td class="px-4 py-2 text-right text-gray-400" x-text="log.output_tokens"></td>
+                                        <td class="px-4 py-2 text-right text-gray-400" x-text="'$' + parseFloat(log.total_cost_usd || 0).toFixed(6)"></td>
+                                        <td class="px-4 py-2 text-right text-gray-400" x-text="log.latency_ms + 'ms'"></td>
+                                        <td class="px-4 py-2 text-center">
+                                            <span :class="log.status_code < 400 ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'" class="px-2 py-0.5 rounded-full text-xs" x-text="log.status_code"></span>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p x-show="usageLogs.length === 0" class="text-center text-gray-500 py-8 text-sm">No usage logs yet</p>
+                </div>
+            </div>
+        </div>
+    </main>
 
-            <!-- Toast Notification -->
-            <div class="toast" x-show="toast.show" x-transition :class="'toast-' + toast.type" x-text="toast.message"></div>
-        </main>
+    <!-- ============================================================ -->
+    <!-- TOAST NOTIFICATION QUEUE                                     -->
+    <!-- ============================================================ -->
+    <div class="fixed bottom-4 right-4 z-50 space-y-2">
+        <template x-for="(t, idx) in toasts" :key="t.id">
+            <div x-show="t.visible" x-transition:enter="toast-enter" x-transition:leave="toast-leave"
+                 :class="{
+                    'bg-green-600': t.type === 'success',
+                    'bg-red-600': t.type === 'error',
+                    'bg-blue-600': t.type === 'info',
+                 }"
+                 class="px-4 py-3 rounded-xl text-white text-sm shadow-lg max-w-sm">
+                <span x-text="t.message"></span>
+            </div>
+        </template>
     </div>
 
     <script src="/assets/app.js"></script>

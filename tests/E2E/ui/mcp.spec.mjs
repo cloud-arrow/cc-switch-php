@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
-import { navTo, clickInSection, dialogFill, dialogClick, closeDialogs, tableHasRow, clickRowAction, withConfirm } from './helpers.mjs';
+import { navTo, clickInSection, dialogFill, closeDialogs, tableHasRow, clickRowAction, withConfirm } from './helpers.mjs';
 
-test.describe('MCP Tab', () => {
+test.describe('MCP View', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/', { waitUntil: 'networkidle' });
     await navTo(page, 'MCP');
@@ -12,32 +12,36 @@ test.describe('MCP Tab', () => {
   });
 
   test('MCP page renders', async ({ page }) => {
-    const ok = await page.evaluate(() => {
-      for (const s of document.querySelectorAll('main.content > section'))
-        if (s.offsetParent !== null && s.style.display !== 'none')
-          return s.textContent.includes('MCP');
-      return false;
-    });
+    const ok = await page.evaluate(() =>
+      document.body.textContent.includes('MCP Servers'));
     expect(ok).toBe(true);
   });
 
   test('add MCP server', async ({ page }) => {
     await clickInSection(page, '+ Add');
     await page.waitForTimeout(300);
-    await dialogFill(page, 'input[placeholder="Server name"]', 'PW MCP Server');
-    await dialogFill(page, 'input[placeholder*="npx"]', 'echo');
-    await dialogClick(page, 'footer button:not(.secondary)');
+
+    // In MCP form view now
+    await dialogFill(page, 'input[placeholder="server-id"]', 'pw-mcp');
+    await dialogFill(page, 'input[placeholder="Display name"]', 'PW MCP Server');
+    await dialogFill(page, 'input[placeholder="npx"]', 'echo');
+
+    // Click the form's save button (uses x-text for label)
+    await page.evaluate(() => {
+      const btn = document.querySelector('button[x-text*="editingMcp"]');
+      if (btn) btn.click();
+    });
     await page.waitForTimeout(1000);
 
     expect(await tableHasRow(page, 'PW MCP Server')).toBe(true);
 
     // Cleanup
-    await withConfirm(page, () => clickRowAction(page, 'PW MCP Server', 'Del'));
+    await withConfirm(page, () => clickRowAction(page, 'PW MCP Server', 'Delete'));
   });
 
   test('sync MCP servers', async ({ page }) => {
     await clickInSection(page, 'Sync');
     await page.waitForTimeout(1000);
-    // Should not crash — toast may appear
+    // Should not crash
   });
 });

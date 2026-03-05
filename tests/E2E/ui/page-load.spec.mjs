@@ -14,22 +14,26 @@ test.describe('Page Load', () => {
   test('Alpine.js initializes and renders data', async ({ page }) => {
     await page.goto('/', { waitUntil: 'networkidle' });
     await page.waitForFunction(() =>
-      document.querySelector('table tbody tr') !== null ||
-      document.body.textContent.includes('No providers'),
+      document.querySelector('main') !== null &&
+      (document.body.textContent.includes('Providers') ||
+       document.body.textContent.includes('No providers')),
     { timeout: 10000 });
   });
 
-  test('sidebar has 7 navigation tabs', async ({ page }) => {
+  test('top navbar has navigation elements', async ({ page }) => {
     await page.goto('/', { waitUntil: 'networkidle' });
-    const tabs = await page.$$eval('nav.sidebar li a', els => els.map(e => e.textContent.trim()));
-    for (const t of ['Providers', 'MCP', 'Proxy', 'Skills', 'Prompts', 'Settings', 'Usage']) {
-      expect(tabs).toContain(t);
-    }
+    // Check for CC Switch title
+    const title = await page.textContent('nav h1');
+    expect(title).toContain('CC Switch');
+    // Check for tool buttons
+    const toolBtns = await page.$$eval('nav button[title]', els => els.map(e => e.title));
+    expect(toolBtns).toContain('Settings');
   });
 
-  test('app selector shows 5 app buttons', async ({ page }) => {
+  test('app switcher shows 5 app buttons', async ({ page }) => {
     await page.goto('/', { waitUntil: 'networkidle' });
-    const count = await page.$$eval('.app-selector button', els => els.length);
+    // App switcher pills in navbar
+    const count = await page.$$eval('nav .rounded-xl button', els => els.length);
     expect(count).toBe(5);
   });
 

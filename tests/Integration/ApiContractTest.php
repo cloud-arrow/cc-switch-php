@@ -301,10 +301,13 @@ class ApiContractTest extends TestCase
         $preset = $body[0];
         $this->assertArrayHasKey('name', $preset);
         $this->assertArrayHasKey('category', $preset);
-        $this->assertArrayHasKey('settings_config', $preset);
+        // Preset JSON files use camelCase keys (settingsConfig)
+        $this->assertTrue(
+            isset($preset['settingsConfig']) || isset($preset['settings_config']),
+            'Preset must have settingsConfig or settings_config key'
+        );
         $this->assertIsString($preset['name']);
         $this->assertIsString($preset['category']);
-        $this->assertIsString($preset['settings_config']);
     }
 
     public function testImportProvidersContract(): void

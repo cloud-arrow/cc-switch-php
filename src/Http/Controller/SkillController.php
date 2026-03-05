@@ -55,6 +55,22 @@ class SkillController
         return ['status' => 200, 'body' => ['ok' => true]];
     }
 
+    public function update(array $vars, array $body): array
+    {
+        $id = $vars['id'];
+        $updates = [];
+        foreach (['enabled_claude', 'enabled_codex', 'enabled_gemini', 'enabled_opencode'] as $field) {
+            if (isset($body[$field])) {
+                $updates[$field] = (int) $body[$field];
+            }
+        }
+        if (empty($updates)) {
+            return ['status' => 400, 'body' => ['error' => 'No valid fields to update']];
+        }
+        $this->service->update($id, $updates);
+        return ['status' => 200, 'body' => ['ok' => true]];
+    }
+
     public function sync(): array
     {
         $this->service->syncToApps();
