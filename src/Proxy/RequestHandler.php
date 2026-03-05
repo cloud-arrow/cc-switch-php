@@ -117,6 +117,31 @@ class RequestHandler
             $providerConfig = [];
         }
 
+        $meta = $provider->decodeMeta();
+
+        // Gemini native API: transparent pass-through (no body transformation)
+        if ($appType === 'gemini' && str_contains($path, '/v1beta/')) {
+            $upstreamUrl = $this->buildUpstreamUrl($provider, $providerConfig, $path);
+            $upstreamHeaders = $this->buildUpstreamHeaders($provider, $providerConfig, $request->header ?? []);
+            // Preserve query string (e.g. ?alt=sse for streaming)
+            $queryString = $request->server['query_string'] ?? '';
+            if ($queryString !== '') {
+                $upstreamUrl .= '?' . $queryString;
+            }
+            // Extract model from URL path: /v1beta/models/{model}:method
+            $effectiveModel = 'unknown';
+            if (preg_match('#/models/([^/:]+)#', $path, $m)) {
+                $effectiveModel = $m[1];
+            }
+            $isStreaming = str_contains($path, 'stream') || str_contains($queryString, 'alt=sse');
+            $this->handleGeminiPassthrough(
+                $response, $provider, $upstreamHeaders, $upstreamUrl,
+                $rawBody, $config, $appType, $effectiveModel,
+                $startTime, $isStreaming, $meta->costMultiplier ?? '1.0', $meta->providerType
+            );
+            return;
+        }
+
         // Apply model mapping
         $mappingResult = $this->modelMapper->apply($body, $providerConfig);
         $body = $mappingResult['body'];
@@ -125,7 +150,6 @@ class RequestHandler
         $effectiveModel = $mappedModel ?? $originalModel ?? 'unknown';
 
         // Determine provider's API format and if conversion is needed
-        $meta = $provider->decodeMeta();
         $providerFormat = $meta->apiFormat ?? $this->inferProviderFormat($appType);
         $requestFormat = $this->detectRequestFormat($path, $body);
 
@@ -453,6 +477,130 @@ class RequestHandler
     /**
      * Build the upstream URL for the provider.
      */
+    /**
+     * Handle Gemini native API requests by transparently proxying the raw body.
+     */
+    private function handleGeminiPassthrough(
+        Response $response,
+        Provider $provider,
+        array $headers,
+        string $url,
+        string $rawBody,
+        ProxyConfig $config,
+        string $appType,
+        string $model,
+        float $startTime,
+        bool $isStreaming,
+        string $costMultiplier,
+        ?string $providerType,
+    ): void {
+        $client = new Client(array_merge([
+            'timeout' => $isStreaming ? $config->streaming_idle_timeout : $config->non_streaming_timeout,
+            'connect_timeout' => 10,
+            'verify' => true,
+            'http_errors' => false,
+            'stream' => $isStreaming,
+        ], $this->proxyOptions));
+
+        $statusCode = 502;
+        $error = null;
+
+        try {
+            $upstreamResponse = $client->request('POST', $url, [
+                'headers' => $headers,
+                'body' => $rawBody,
+            ]);
+
+            $statusCode = $upstreamResponse->getStatusCode();
+
+            if ($isStreaming) {
+                // Stream SSE events back to client
+                $response->status($statusCode);
+                foreach ($upstreamResponse->getHeaders() as $name => $values) {
+                    foreach ($values as $value) {
+                        $response->header($name, $value);
+                    }
+                }
+
+                $body = $upstreamResponse->getBody();
+                $fullResponse = '';
+                while (!$body->eof()) {
+                    $chunk = $body->read(8192);
+                    if ($chunk !== '') {
+                        $response->write($chunk);
+                        $fullResponse .= $chunk;
+                    }
+                }
+                $response->end();
+
+                // Parse usage from Gemini response
+                $usage = $this->parseGeminiUsage($fullResponse);
+            } else {
+                $responseBody = $upstreamResponse->getBody()->getContents();
+                $response->status($statusCode);
+                $response->header('Content-Type', 'application/json');
+                $response->end($responseBody);
+
+                $usage = $this->parseGeminiUsage($responseBody);
+            }
+
+            if ($statusCode >= 500) {
+                $this->circuitBreaker->recordFailure($provider->id, $appType, 'HTTP ' . $statusCode);
+            } else {
+                $this->circuitBreaker->recordSuccess($provider->id, $appType);
+            }
+        } catch (\Throwable $e) {
+            $error = $e->getMessage();
+            $this->circuitBreaker->recordFailure($provider->id, $appType, $error);
+            $this->respondJson($response, 502, [
+                'error' => ['message' => 'Upstream error: ' . $error, 'type' => 'proxy_error'],
+            ]);
+            $usage = ['input_tokens' => 0, 'output_tokens' => 0];
+        }
+
+        $latencyMs = (int) ((microtime(true) - $startTime) * 1000);
+
+        if ($config->enable_logging) {
+            $this->usageLogger->log([
+                'provider_id' => $provider->id,
+                'app_type' => $appType,
+                'model' => $model,
+                'request_model' => $model,
+                'input_tokens' => $usage['input_tokens'] ?? 0,
+                'output_tokens' => $usage['output_tokens'] ?? 0,
+                'cache_read_tokens' => 0,
+                'cache_creation_tokens' => 0,
+                'latency_ms' => $latencyMs,
+                'first_token_ms' => null,
+                'status_code' => $statusCode,
+                'error_message' => $error,
+                'is_streaming' => $isStreaming ? 1 : 0,
+                'cost_multiplier' => $costMultiplier,
+                'provider_type' => $providerType,
+            ]);
+        }
+    }
+
+    /**
+     * Parse usage metadata from Gemini API response (native format).
+     */
+    private function parseGeminiUsage(string $responseBody): array
+    {
+        $input = 0;
+        $output = 0;
+        // Gemini SSE responses contain usageMetadata in the last event
+        // Try to find usageMetadata in the response
+        if (preg_match('/"usageMetadata"\s*:\s*\{[^}]*"promptTokenCount"\s*:\s*(\d+)[^}]*"candidatesTokenCount"\s*:\s*(\d+)/s', $responseBody, $m)) {
+            $input = (int) $m[1];
+            $output = (int) $m[2];
+        } elseif (preg_match('/"promptTokenCount"\s*:\s*(\d+)/', $responseBody, $m1) &&
+                  preg_match('/"candidatesTokenCount"\s*:\s*(\d+)/', $responseBody, $m2)) {
+            $input = (int) $m1[1];
+            $output = (int) $m2[1];
+        }
+        return ['input_tokens' => $input, 'output_tokens' => $output];
+    }
+
     private function buildUpstreamUrl(Provider $provider, array $providerConfig, string $requestPath): string
     {
         $meta = $provider->decodeMeta();
@@ -469,6 +617,7 @@ class RequestHandler
         $env = $providerConfig['env'] ?? [];
         $baseUrl = $env['ANTHROPIC_BASE_URL']
             ?? $env['OPENAI_BASE_URL']
+            ?? $env['GOOGLE_GEMINI_BASE_URL']
             ?? $env['API_BASE_URL']
             ?? null;
 
@@ -481,6 +630,7 @@ class RequestHandler
         return match ($providerType) {
             'claude', 'claude_auth' => 'https://api.anthropic.com' . $requestPath,
             'codex' => 'https://api.openai.com' . $requestPath,
+            'gemini' => 'https://generativelanguage.googleapis.com' . $requestPath,
             'openrouter' => 'https://openrouter.ai/api' . $requestPath,
             default => 'https://api.anthropic.com' . $requestPath,
         };
@@ -497,16 +647,25 @@ class RequestHandler
             'Accept' => 'application/json',
         ];
 
-        // API key
-        $apiKey = $env['ANTHROPIC_API_KEY'] ?? $env['OPENAI_API_KEY'] ?? $env['API_KEY'] ?? null;
+        // API key — support all provider types
+        $apiKey = $env['ANTHROPIC_API_KEY']
+            ?? $env['OPENAI_API_KEY']
+            ?? $env['GEMINI_API_KEY']
+            ?? $env['API_KEY']
+            ?? null;
+
         if ($apiKey !== null) {
             $headers['x-api-key'] = $apiKey;
             $headers['Authorization'] = 'Bearer ' . $apiKey;
+            // Gemini API uses x-goog-api-key header
+            $headers['x-goog-api-key'] = $apiKey;
         }
 
-        // Anthropic version header
-        $anthropicVersion = $env['ANTHROPIC_API_VERSION'] ?? '2023-06-01';
-        $headers['anthropic-version'] = $anthropicVersion;
+        // Anthropic version header (only relevant for Claude)
+        if ($provider->app_type === 'claude') {
+            $anthropicVersion = $env['ANTHROPIC_API_VERSION'] ?? '2023-06-01';
+            $headers['anthropic-version'] = $anthropicVersion;
+        }
 
         // Forward select headers from the original request
         $forwardHeaders = ['anthropic-beta', 'anthropic-dangerous-direct-browser-access'];
